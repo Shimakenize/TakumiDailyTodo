@@ -434,6 +434,8 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   function loadState(silent){
     var ymd=S.sel;
     if(!silent){S.state=null;if(S.tab==='ck')renderCheck();}
+    // 端末キャッシュで先に描画している間（LINE ログイン前）は問い合わせない。api/boot が今日分を入れる
+    if(!DEV&&!S.idToken)return Promise.resolve();
     return api('api/state',{date:ymd}).then(function(st){if(ymd!==S.sel)return;S.state=st;if(S.tab==='ck')renderCheck();})
       .catch(function(e){clog('state_fail',e.message);$('main').innerHTML='<div class="msg">読み込みエラー: '+esc(e.message)+'</div>';$('diag').hidden=false;renderDiag();});
   }
@@ -494,23 +496,71 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.onclick=function(){S.tab=b.getAttribute('data-tab');renderHeader();render();if(S.tab==='ck')loadState();if(S.tab==='db')openDashboard();};});
 
   // ---- 起動 ----
+  // 速さのため（2026-10-06）:
+  //  1) 時間割データ（月1回しか変わらない）を端末に保存し、LINE の初期化を待たずに即描画
+  //  2) サーバーへの問い合わせは api/boot の1回（アカウント確認＋時間割＋帰宅チェック）。時間割は版が同じなら送らない
+  //  3) LIFF ID・版は端末に覚え、config の往復を待たない（config は裏で取り直す）
+  var CACHE_KEY='tdt_boot_v1';
+  function cacheLoad(){try{var c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');return c&&c.ver&&c.school?c:null;}catch(e){return null;}}
+  function cacheSave(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){}}
+  function cacheClear(){try{localStorage.removeItem(CACHE_KEY);}catch(e){}}
+  function applySchool(sc){
+    S.school=sc.school;S.overrides=sc.overrides||{};S.daily=sc.daily_items;S.kinds=sc.kinds;S.plans=sc.plans;
+    var m=(sc.school.months||[]).filter(function(x){return x.dismissal_time;})[0];
+    $('dismiss').textContent=m?'総下校 '+m.dismissal_time:'';
+  }
+  function applyRole(role){
+    S.role=role||'';
+    if(S.role==='owner'){$('famlink').hidden=false;$('famlink').onclick=openFamily;}
+  }
+  var started=false;
+  function startUi(){
+    if(started)return;started=true;
+    S.base=jstToday();S.sel=S.base;
+    // 下校後（14時以降）の授業日は帰宅チェックから開く
+    S.tab=(jstHour()>=14&&!isOff(S.base))?'ck':'tt';
+    var q=new URLSearchParams(location.search).get('tab');if(q==='ck'||q==='tt')S.tab=q;
+    renderHeader();render();
+  }
+  function showFatal(msg){
+    var html='初期化エラー: '+esc(msg)+'<br><button type="button" class="big ghost" id="reloadBtn" style="width:100%">再読み込み</button>';
+    var b=$('boot');
+    if(b)b.innerHTML=html;
+    else $('main').insertAdjacentHTML('afterbegin','<div class="msg" style="padding:8px;background:#FEF0EF;border-radius:8px">'+html+'</div>');
+    $('reloadBtn').onclick=function(){location.reload();};
+    $('diag').hidden=false;renderDiag();
+  }
   (async function main(){
     try{
-      clog('boot',location.pathname+location.search.replace(/dev=[^&]*/,'dev=***'));
-      bootMsg('サーバーに接続中…');
-      var c=await getConfig();
-      APPV=(c.version||'')+(c.deploy_num?'('+c.deploy_num+')':'');
-      $('ver').textContent='v'+APPV;
-      clog('config_ok',APPV);
+      clog('boot',location.pathname+location.search.replace(/dev=[^&]*/,'dev=***').replace(/code=[^&]*/,'code=***'));
+      var cache=cacheLoad();
+      if(cache){
+        applySchool(cache);applyRole(cache.role);
+        if(cache.appv){APPV=cache.appv;$('ver').textContent='v'+APPV;}
+        startUi();
+        clog('cache_render','ver '+cache.ver);
+      }
+      var liffId='';try{liffId=localStorage.getItem('tdt_liff_id')||'';}catch(e){}
+      var cfgP=getConfig().then(function(c){
+        APPV=(c.version||'')+(c.deploy_num?'('+c.deploy_num+')':'');
+        $('ver').textContent='v'+APPV;
+        try{if(c.liff_id)localStorage.setItem('tdt_liff_id',c.liff_id);}catch(e){}
+        clog('config_ok',APPV);
+        return c;
+      });
+      if(!liffId||DEV){bootMsg('サーバーに接続中…');liffId=(await cfgP).liff_id;}
+      else cfgP.catch(function(e){clog('config_fail',e.message);});
       if(!DEV){
         bootMsg('LINE の準備中…');
         await withTimeout(loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js'),20000,'LIFF SDK の読み込み');
         clog('sdk_ok');
-        if(!c.liff_id){bootMsg('LIFF_ID が未設定です');clog('no_liff_id');return;}
-        await withTimeout(liff.init({liffId:c.liff_id,withLoginOnExternalBrowser:true}),20000,'LINE の初期化 (liff.init)');
+        if(!liffId){bootMsg('LIFF_ID が未設定です');clog('no_liff_id');return;}
+        var qs=location.search;
+        clog('liff_init_start','code='+/[?&]code=/.test(qs)+' liff.state='+/liff\.state/.test(qs)+' ref='+(document.referrer||'').slice(0,60));
+        await withTimeout(liff.init({liffId:liffId,withLoginOnExternalBrowser:true}),20000,'LINE の初期化 (liff.init)');
         var ctx=liff.getContext&&liff.getContext();
         LOG_UID=(ctx&&ctx.userId)||'';
-        clog('liff_init_ok','inClient='+(liff.isInClient&&liff.isInClient())+' os='+(liff.getOS&&liff.getOS())+' lang='+(liff.getLanguage&&liff.getLanguage())+' liffver='+(liff.getVersion&&liff.getVersion())+' type='+(ctx&&ctx.type));
+        clog('liff_init_ok','inClient='+(liff.isInClient&&liff.isInClient())+' os='+(liff.getOS&&liff.getOS())+' lang='+(liff.getLanguage&&liff.getLanguage())+' liffver='+(liff.getVersion&&liff.getVersion())+' type='+(ctx&&ctx.type)+' loggedIn='+liff.isLoggedIn());
         if(!liff.isLoggedIn()){clog('login_redirect','not logged in');liff.login({redirectUri:location.href.split('#')[0]});return;}
         S.idToken=liff.getIDToken()||'';
         if(!S.idToken||jwtExpired(S.idToken)){
@@ -521,34 +571,28 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
         clog('id_token_ok');
       }
       bootMsg('アカウントを確認中…');
-      var me=await api('auth/me');
+      var today=jstToday();
+      var bt=await api('api/boot',{date:today,school_ver:cache?cache.ver:''});
+      var me=bt.me;
       LOG_UID=me.user_id||LOG_UID;
       if(!me.access_granted){
-        $('boot').innerHTML=me.status==='rejected'?'このLINEアカウントでは利用できません。':esc(me.name||'')+' さん、家族の登録を待っています。<br>お父さんに通知しました。承認されたら開き直してください。';
+        cacheClear();
+        $('main').innerHTML='<div class="msg">'+(me.status==='rejected'?'このLINEアカウントでは利用できません。':esc(me.name||'')+' さん、家族の登録を待っています。<br>お父さんに通知しました。承認されたら開き直してください。')+'</div>';
         return;
       }
-      S.role=me.role||'';
-      if(S.role==='owner'){$('famlink').hidden=false;$('famlink').onclick=openFamily;}
+      applyRole(me.role);
       if(me.auto_registered)setTimeout(function(){toast(me.name+' さんを家族として登録しました');},600);
-      bootMsg('時間割を読み込み中…');
-      var sc=await api('api/schedule');
-      S.school=sc.school;S.overrides=sc.overrides||{};S.daily=sc.daily_items;S.kinds=sc.kinds;S.plans=sc.plans;
-      var m=(sc.school.months||[]).filter(function(x){return x.dismissal_time;})[0];
-      $('dismiss').textContent=m?'総下校 '+m.dismissal_time:'';
-      S.base=jstToday();S.sel=S.base;
-      // 下校後（14時以降）の授業日は帰宅チェックから開く
-      S.tab=(jstHour()>=14&&!isOff(S.base))?'ck':'tt';
-      var q=new URLSearchParams(location.search).get('tab');if(q==='ck'||q==='tt')S.tab=q;
-      renderHeader();render();loadState();
-      clog('boot_done','total '+(Date.now()-T0)+'ms');
+      var sc=bt.schedule;
+      if(sc.school){applySchool(sc);}else{S.overrides=sc.overrides||{};}
+      cacheSave({ver:bt.school_ver,school:S.school,overrides:S.overrides,daily_items:S.daily,kinds:S.kinds,plans:S.plans,role:S.role,appv:APPV});
+      if(S.sel===today||!started)S.state=bt.state;
+      if(!started)startUi();
+      else{renderHeader();render();}
+      if(S.tab==='ck'&&S.sel!==today)loadState();
+      clog('boot_done','total '+(Date.now()-T0)+'ms school '+(sc.school?'sent':'cached'));
     }catch(e){
       clog('init_fail',(e&&e.message||e)+(e&&e.stack?' | '+String(e.stack).split('\n').slice(0,3).join(' / '):''));
-      var b=$('boot');
-      if(b){
-        b.innerHTML='初期化エラー: '+esc(e&&e.message||e)+'<br><button type="button" class="big ghost" id="reloadBtn" style="width:100%">再読み込み</button>';
-        $('reloadBtn').onclick=function(){location.reload();};
-      }
-      $('diag').hidden=false;renderDiag();
+      showFatal(e&&e.message||e);
     }
   })();
   // 「v…」を長押し／タップで診断を表示（スクショで送ってもらう用）
