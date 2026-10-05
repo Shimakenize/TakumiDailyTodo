@@ -133,10 +133,21 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
     var payload=Object.assign({_path:path},body||{});
     if(DEV)payload.dev_token=DEV;else payload.id_token=S.idToken;
     return fetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)})
-      .then(function(r){return r.json();})
+      .then(function(r){return parseJson(r,path);})
       .then(function(j){if(j.error)throw new Error(j.error);return j;});
   }
-  function getConfig(){return fetch(CONFIG_URL+'?_path=config').then(function(r){return r.json();});}
+  // GAS が JSON 以外（HTML のエラーページ等）を返したとき、どの API で何が返ったかを画面に出す
+  function parseJson(r,path){
+    return r.text().then(function(t){
+      try{return JSON.parse(t);}
+      catch(e){
+        var title=(t.match(/<title>([^<]*)<\/title>/i)||[])[1]||'';
+        var text=t.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+        throw new Error(path+' が JSON 以外を返しました (HTTP '+r.status+') '+title+' / '+text.slice(0,200));
+      }
+    });
+  }
+  function getConfig(){return fetch(CONFIG_URL+'?_path=config').then(function(r){return parseJson(r,'config');});}
   function loadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('script load failed'));};document.head.appendChild(s);});}
   function jwtExpired(t){try{var p=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');while(p.length%4)p+='=';return JSON.parse(atob(p)).exp<Date.now()/1000+45;}catch(e){return false;}}
 
