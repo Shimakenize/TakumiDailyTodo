@@ -211,14 +211,12 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
 
   // ---- 帰宅チェック ----
   function blankForm(){
-    var f={daily:{},subjects:{}};
-    S.daily.forEach(function(k){f.daily[k]=false;});
+    var f={subjects:{}};
     (S.state.subjects||[]).forEach(function(n){f.subjects[n]={plan:'today'};});
     return f;
   }
   function formFromCheckin(ck){
     var f=blankForm();
-    Object.keys(ck.daily||{}).forEach(function(k){f.daily[k]=!!ck.daily[k];});
     Object.keys(f.subjects).forEach(function(n){if(ck.subjects[n])f.subjects[n]=Object.assign({plan:'today'},ck.subjects[n]);});
     return f;
   }
@@ -228,7 +226,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
   function taskBtn(t,showOrigin){
     var c=col(t.subject);
     var dueTxt=showOrigin?(mdw(t.origin_date)+'分 · 〜'+mdw(t.due_date)):'';
-    return '<button type="button" class="task'+(t.done?' done':'')+'" data-task="'+esc(t.id)+'" data-done="'+(t.done?1:0)+'"><span class="box">'+IC_CHECK+'</span><span class="tsub" style="background:'+c[0]+';color:'+c[1]+'">'+esc(t.subject)+'</span><span class="kt">'+esc(t.kind)+'</span>'+(t.overdue?'<span class="tag red">期限切れ</span>':dueTxt?'<span class="due">'+esc(dueTxt)+'</span>':'')+'</button>';
+    return '<button type="button" class="task'+(t.done?' done':'')+'" data-task="'+esc(t.id)+'" data-done="'+(t.done?1:0)+'"><span class="box">'+IC_CHECK+'</span>'+(t.subject?'<span class="tsub" style="background:'+c[0]+';color:'+c[1]+'">'+esc(t.subject)+'</span>':'')+'<span class="kt">'+esc(t.kind)+'</span>'+(t.overdue?'<span class="tag red">期限切れ</span>':dueTxt?'<span class="due">'+esc(dueTxt)+'</span>':'')+'</button>';
   }
 
   function goalHtml(){
@@ -254,9 +252,8 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
     }else if(needEntry){
       if(!S.form)S.form=st.checkin?formFromCheckin(st.checkin):blankForm();
       var f=S.form,pending=0;
-      h+='<div class="h">まずこれ</div><div class="grid3 daily">';
-      S.daily.forEach(function(k){if(!f.daily[k])pending++;h+='<button type="button" class="tg'+(f.daily[k]?' on':'')+'" data-daily="'+esc(k)+'">'+(f.daily[k]?'✓ ':'')+esc(k)+'</button>';});
-      h+='</div><div class="h">今日の授業の宿題</div><div class="note">あるものを選んで、いつやるか決める。無ければ「なし」。</div>';
+      h+='<div class="note" style="margin-top:12px">送ったあと「すぐやる」に '+esc(S.daily.join('・'))+' が入ります。</div>';
+      h+='<div class="h">今日の授業の宿題</div><div class="note">あるものを選んで、いつやるか決める。無ければ「なし」。</div>';
       st.subjects.forEach(function(n){
         var s=f.subjects[n],c=col(n),ok=decided(s);if(!ok)pending++;
         h+='<div class="card'+(ok?'':' todo')+'"><div class="shead"><div class="sname" style="background:'+c[0]+';color:'+c[1]+'">'+esc(n)+'</div><div class="state" style="color:'+(ok?'#1C6436':'#B25A00')+'">'+(ok?(hasTask(s)?'あり':'なし'):'未記入')+'</div></div><div class="grid3">';
@@ -274,7 +271,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
       h+='<button type="button" class="big '+(pending?'wait':'go')+'" id="submit"'+(pending||S.busy?' disabled':'')+'>'+(S.busy?'送信中…':pending?'あと '+pending+' 個':'記入完了 → 家族のLINEに送る')+'</button>';
       if(st.checkin)h+='<button type="button" class="big ghost" id="cancelEdit">修正をやめる</button>';
     }else{
-      var groups=[['today','今日やる','寝る前まで','#0F5E73'],['morning','明日の朝',mdw(st.due_preview.morning)+' 登校前','#8F430A'],['weekend','週末','〜'+mdw(st.due_preview.weekend),'#55298A']];
+      var groups=[['now','すぐやる','帰ったらまず','#B42318'],['today','今日やる','寝る前まで','#0F5E73'],['morning','明日の朝',mdw(st.due_preview.morning)+' 登校前','#8F430A'],['weekend','週末','〜'+mdw(st.due_preview.weekend),'#55298A']];
       var any=false;
       groups.forEach(function(g){
         var items=st.day_tasks.filter(function(t){return t.plan===g[0];});
@@ -282,7 +279,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
         h+='<div class="ghead"><b style="color:'+g[3]+'">'+g[1]+'</b><span>'+esc(g[2])+'</span></div>';
         items.forEach(function(t){h+=taskBtn(Object.assign({},t,{overdue:!t.done&&t.due_date<jstToday()}),false);});
       });
-      if(!any)h+='<div class="off-card" style="margin-top:12px"><b>宿題なし</b><div class="note">記入済み（'+esc(new Date(Date.parse(st.checkin.submitted_at)+9*3600e3).toISOString().slice(11,16))+'）</div></div>';
+      if(!st.day_tasks.some(function(t){return t.plan!=='now';}))h+='<div class="off-card" style="margin-top:12px"><b>宿題なし</b><div class="note">記入済み（'+esc(new Date(Date.parse(st.checkin.submitted_at)+9*3600e3).toISOString().slice(11,16))+'）</div></div>';
       h+='<button type="button" class="big ghost" id="edit">記入を修正する</button>';
     }
     $('main').innerHTML=h;
@@ -291,7 +288,6 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
 
   function bindCheck(){
     var f=S.form;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-daily]'),function(b){b.onclick=function(){var k=b.getAttribute('data-daily');f.daily[k]=!f.daily[k];renderCheck();};});
     Array.prototype.forEach.call(document.querySelectorAll('[data-kind]'),function(b){b.onclick=function(){
       var s=f.subjects[b.getAttribute('data-subj')],k=b.getAttribute('data-kind');
       if(k==='none'){var v=!s.none;S.kinds.forEach(function(x){s[x]=false;});s.none=v;}else{s[k]=!s[k];s.none=false;}
@@ -310,7 +306,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
 
   function submit(){
     if(S.busy)return;S.busy=true;renderCheck();
-    api('api/checkin',{date:S.sel,daily:S.form.daily,subjects:S.form.subjects}).then(function(r){
+    api('api/checkin',{date:S.sel,subjects:S.form.subjects}).then(function(r){
       S.busy=false;S.editing=false;S.form=null;
       toast(r.line_sent?'家族のLINEに送りました':'保存しました（LINE送信はまだ設定されていません）');
       return loadState();
