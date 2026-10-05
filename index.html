@@ -15,7 +15,7 @@ button{font-family:inherit;cursor:pointer}
 .app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 header{background:var(--ink);color:#fff;padding:8px 10px 8px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;z-index:5}
 .toprow{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#B8C4CF;letter-spacing:.04em}
-.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;background:#26323E;padding:3px;border-radius:9px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:#26323E;padding:3px;border-radius:9px}
 .seg button{height:32px;border:0;border-radius:7px;font-size:13px;font-weight:700;background:transparent;color:#B8C4CF}
 .seg button.on{background:#fff;color:var(--ink)}
 .daynav{display:flex;align-items:center;justify-content:space-between;gap:6px}
@@ -101,6 +101,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     <div class="seg" id="tabs">
       <button type="button" data-tab="tt">時間割</button>
       <button type="button" data-tab="ck">帰宅チェック</button>
+      <button type="button" data-tab="db">Dashboard</button>
     </div>
     <div class="daynav">
       <button type="button" class="round" id="prev" aria-label="前の日"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -376,11 +377,26 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     Array.prototype.forEach.call(document.querySelectorAll('[data-day]'),function(b){b.onclick=function(){go(b.getAttribute('data-day'));};});
   }
   function go(ymd){if(S.tab==='fam')S.tab='tt';S.sel=ymd;S.form=null;S.editing=false;renderHeader();render();if(S.tab==='ck')loadState();}
-  function render(){if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else renderCheck();}
+  // ---- Dashboard（Sony Home と同じ全ページ。REGALIA の外出先ダイニングTV LIFF を開く）----
+  // 正本は Sony_HomeTerminal。読み上げ・自動巡回なし、1ページずつ・左右スワイプでページ移動、開始は今日のHL、横画面
+  var DASHBOARD_URL='https://liff.line.me/2009694691-kbVAb4DC/home-terminal.html';
+  function openDashboard(){
+    try{
+      if(window.liff&&liff.isInClient&&liff.isInClient()){liff.openWindow({url:DASHBOARD_URL,external:false});return;}
+    }catch(e){}
+    location.href=DASHBOARD_URL;
+  }
+  function renderDashboard(){
+    $('main').innerHTML='<div class="h">Dashboard</div>'+
+      '<div class="note">Sony Home と同じ全ページ（今日のHL・明日のHL・予定(2日)・天気(3日)・今週のHL・週TL・順位）を、スマホを横にして1ページずつ見られます。左右にスワイプでページ移動。</div>'+
+      '<button type="button" class="big go" id="openDash">Dashboard を開く</button>';
+    $('openDash').onclick=openDashboard;
+  }
+  function render(){if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else if(S.tab==='db')renderDashboard();else renderCheck();}
 
   $('prev').onclick=function(){go(addDays(S.sel,-1));};
   $('next').onclick=function(){go(addDays(S.sel,1));};
-  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.onclick=function(){S.tab=b.getAttribute('data-tab');renderHeader();render();if(S.tab==='ck')loadState();};});
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.onclick=function(){S.tab=b.getAttribute('data-tab');renderHeader();render();if(S.tab==='ck')loadState();if(S.tab==='db')openDashboard();};});
 
   // ---- 起動 ----
   (async function main(){
