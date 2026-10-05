@@ -85,6 +85,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .goal{background:#fff;border-radius:8px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--sub);line-height:1.35}
 .goal b{font-size:16px;color:var(--ink)}
 .msg{padding:20px 12px;text-align:center;color:var(--sub);font-size:12px;line-height:1.6}
+#diag{margin:4px 8px;padding:6px 8px;background:#0F1720;color:#C9D3DB;border-radius:6px;font:10px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:45vh;overflow:auto}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10;max-width:90vw}
 .toast.show{opacity:1}
 .ver{font-size:10px;color:var(--mute);text-align:center;padding:4px;display:flex;justify-content:center;gap:12px;align-items:center}
@@ -111,6 +112,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     <div class="week" id="week"></div>
   </header>
   <main id="main"><div class="msg" id="boot">読み込み中…</div></main>
+  <pre id="diag" hidden></pre>
   <div class="ver"><span id="ver"></span><button type="button" class="famlink" id="famlink" hidden>家族</button></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -123,6 +125,39 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   var S={role:'',users:null,tab:'tt',base:'',sel:'',school:null,overrides:{},daily:[],kinds:[],plans:{},state:null,form:null,editing:false,idToken:'',busy:false};
 
   function $(id){return document.getElementById(id);}
+
+  // ---- 診断ログ（2026-10-05。「読み込みが長い／初期化エラー」の再現時に原因を特定するため）----
+  // 起動の各段階と API 呼び出しの所要時間を、GAS の client_logs シートへ送る（sendBeacon。失敗しても無視）。
+  // 同じ内容を画面下の「診断」にも出す。sid で1回の起動をまとめて追える。
+  var SID=Math.random().toString(36).slice(2,10);
+  var T0=Date.now();
+  var LOGS=[];
+  var APPV='';
+  var LOG_UID='';
+  function clog(step,msg,extra){
+    var ms=Date.now()-T0;
+    var rec={t:ms,step:step,msg:msg?String(msg).slice(0,500):''};
+    LOGS.push(rec);
+    var el=$('diag');if(el&&!el.hidden)renderDiag();
+    try{
+      var body=Object.assign({_path:'api/client_log',sid:SID,step:step,ms:ms,msg:rec.msg,uid:LOG_UID,ver:APPV,
+        ua:LOGS.length===1?navigator.userAgent.slice(0,200):''},extra||{});
+      var payload=JSON.stringify(body);
+      if(CONFIG_URL.indexOf('https://')!==0)return;
+      if(navigator.sendBeacon&&navigator.sendBeacon(CONFIG_URL,new Blob([payload],{type:'text/plain;charset=utf-8'})))return;
+      fetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload,keepalive:true}).catch(function(){});
+    }catch(e){}
+  }
+  function bootMsg(t){var b=$('boot');if(b)b.textContent=t;}
+  function renderDiag(){
+    var el=$('diag');if(!el)return;
+    el.textContent='診断ID '+SID+' · v'+APPV+'\n'+LOGS.map(function(r){return ('+'+(r.t/1000).toFixed(1)+'s ').padEnd(9)+r.step+(r.msg?' '+r.msg:'');}).join('\n');
+  }
+  window.addEventListener('error',function(ev){clog('js_error',(ev.message||'')+' @'+String(ev.filename||'').split('/').pop()+':'+(ev.lineno||0));});
+  window.addEventListener('unhandledrejection',function(ev){clog('js_reject',ev&&ev.reason&&(ev.reason.message||ev.reason));});
+  function withTimeout(p,ms,label){
+    return Promise.race([p,new Promise(function(_,rej){setTimeout(function(){rej(new Error(label+' が '+(ms/1000)+'秒で応答しません'));},ms);})]);
+  }
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function col(n){return COLORS[n]||['#EEF0F3','#46525F'];}
   function toast(t){var el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(function(){el.classList.remove('show');},2600);}
@@ -139,10 +174,32 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   function api(path,body){
     var payload=Object.assign({_path:path},body||{});
     if(DEV)payload.dev_token=DEV;else payload.id_token=S.idToken;
+    var t=Date.now(),n=0;
     return retryHtml(function(){
-      return fetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)})
+      n++;
+      return timedFetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)},path)
         .then(function(r){return parseJson(r,path);});
-    }).then(function(j){if(j.error)throw new Error(j.error);return j;});
+    }).then(function(j){
+      if(j.error)throw new Error(j.error);
+      clog('api_ok',path+' '+(Date.now()-t)+'ms'+(n>1?' try'+n:''),{api_ms:Date.now()-t});
+      return j;
+    },function(e){
+      clog('api_fail',path+' '+(Date.now()-t)+'ms try'+n+' '+(e&&e.message||e),{api_ms:Date.now()-t});
+      throw e;
+    });
+  }
+  // fetch が返らないまま待ち続けないよう 25 秒で打ち切る（GAS のコールドスタートは数秒〜十数秒）
+  function timedFetch(url,opts,label){
+    var ac=typeof AbortController!=='undefined'?new AbortController():null;
+    var timer=ac?setTimeout(function(){ac.abort();},25000):null;
+    return fetch(url,Object.assign({},opts,ac?{signal:ac.signal}:{})).then(function(r){
+      if(timer)clearTimeout(timer);
+      if(!r.ok)clog('http_status',label+' HTTP '+r.status);
+      return r;
+    },function(e){
+      if(timer)clearTimeout(timer);
+      throw new Error(label+(e&&e.name==='AbortError'?' が25秒で応答しません':' 通信エラー: '+(e&&e.message||e)));
+    });
   }
   // GAS は再デプロイ直後の十数秒、JSON の代わりに Drive の「ページが見つかりません」HTML を返すことがある（2026-10-05 実測）。
   // JSON 以外が返ったときだけ間隔を空けて再試行する
@@ -163,11 +220,12 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       catch(e){
         var title=(t.match(/<title>([^<]*)<\/title>/i)||[])[1]||'';
         var text=t.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+        clog('non_json',path+' HTTP '+r.status+' '+title+' / '+text.slice(0,200));
         throw new Error(path+' が JSON 以外を返しました (HTTP '+r.status+') '+title+' / '+text.slice(0,200));
       }
     });
   }
-  function getConfig(){return retryHtml(function(){return fetch(CONFIG_URL+'?_path=config').then(function(r){return parseJson(r,'config');});});}
+  function getConfig(){return retryHtml(function(){return timedFetch(CONFIG_URL+'?_path=config',{},'config').then(function(r){return parseJson(r,'config');});});}
   function loadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('script load failed'));};document.head.appendChild(s);});}
   function jwtExpired(t){try{var p=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');while(p.length%4)p+='=';return JSON.parse(atob(p)).exp<Date.now()/1000+45;}catch(e){return false;}}
 
@@ -340,7 +398,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     var ymd=S.sel;
     if(!silent){S.state=null;if(S.tab==='ck')renderCheck();}
     return api('api/state',{date:ymd}).then(function(st){if(ymd!==S.sel)return;S.state=st;if(S.tab==='ck')renderCheck();})
-      .catch(function(e){$('main').innerHTML='<div class="msg">読み込みエラー: '+esc(e.message)+'</div>';});
+      .catch(function(e){clog('state_fail',e.message);$('main').innerHTML='<div class="msg">読み込みエラー: '+esc(e.message)+'</div>';$('diag').hidden=false;renderDiag();});
   }
 
   // ---- 家族（オーナーのみ）----
@@ -401,17 +459,33 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   // ---- 起動 ----
   (async function main(){
     try{
+      clog('boot',location.pathname+location.search.replace(/dev=[^&]*/,'dev=***'));
+      bootMsg('サーバーに接続中…');
       var c=await getConfig();
-      $('ver').textContent='v'+(c.version||'')+(c.deploy_num?'('+c.deploy_num+')':'');
+      APPV=(c.version||'')+(c.deploy_num?'('+c.deploy_num+')':'');
+      $('ver').textContent='v'+APPV;
+      clog('config_ok',APPV);
       if(!DEV){
-        await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
-        if(!c.liff_id){$('boot').textContent='LIFF_ID が未設定です';return;}
-        await liff.init({liffId:c.liff_id,withLoginOnExternalBrowser:true});
-        if(!liff.isLoggedIn()){liff.login({redirectUri:location.href.split('#')[0]});return;}
+        bootMsg('LINE の準備中…');
+        await withTimeout(loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js'),20000,'LIFF SDK の読み込み');
+        clog('sdk_ok');
+        if(!c.liff_id){bootMsg('LIFF_ID が未設定です');clog('no_liff_id');return;}
+        await withTimeout(liff.init({liffId:c.liff_id,withLoginOnExternalBrowser:true}),20000,'LINE の初期化 (liff.init)');
+        var ctx=liff.getContext&&liff.getContext();
+        LOG_UID=(ctx&&ctx.userId)||'';
+        clog('liff_init_ok','inClient='+(liff.isInClient&&liff.isInClient())+' os='+(liff.getOS&&liff.getOS())+' lang='+(liff.getLanguage&&liff.getLanguage())+' liffver='+(liff.getVersion&&liff.getVersion())+' type='+(ctx&&ctx.type));
+        if(!liff.isLoggedIn()){clog('login_redirect','not logged in');liff.login({redirectUri:location.href.split('#')[0]});return;}
         S.idToken=liff.getIDToken()||'';
-        if(!S.idToken||jwtExpired(S.idToken)){try{await liff.logout();}catch(e){}liff.login({redirectUri:location.href.split('#')[0]});return;}
+        if(!S.idToken||jwtExpired(S.idToken)){
+          clog('relogin',S.idToken?'id_token expired':'no id_token');
+          try{await liff.logout();}catch(e){}
+          liff.login({redirectUri:location.href.split('#')[0]});return;
+        }
+        clog('id_token_ok');
       }
+      bootMsg('アカウントを確認中…');
       var me=await api('auth/me');
+      LOG_UID=me.user_id||LOG_UID;
       if(!me.access_granted){
         $('boot').innerHTML=me.status==='rejected'?'このLINEアカウントでは利用できません。':esc(me.name||'')+' さん、家族の登録を待っています。<br>お父さんに通知しました。承認されたら開き直してください。';
         return;
@@ -419,6 +493,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       S.role=me.role||'';
       if(S.role==='owner'){$('famlink').hidden=false;$('famlink').onclick=openFamily;}
       if(me.auto_registered)setTimeout(function(){toast(me.name+' さんを家族として登録しました');},600);
+      bootMsg('時間割を読み込み中…');
       var sc=await api('api/schedule');
       S.school=sc.school;S.overrides=sc.overrides||{};S.daily=sc.daily_items;S.kinds=sc.kinds;S.plans=sc.plans;
       var m=(sc.school.months||[]).filter(function(x){return x.dismissal_time;})[0];
@@ -428,10 +503,19 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       S.tab=(jstHour()>=14&&!isOff(S.base))?'ck':'tt';
       var q=new URLSearchParams(location.search).get('tab');if(q==='ck'||q==='tt')S.tab=q;
       renderHeader();render();loadState();
+      clog('boot_done','total '+(Date.now()-T0)+'ms');
     }catch(e){
-      $('boot').textContent='初期化エラー: '+(e&&e.message||e);
+      clog('init_fail',(e&&e.message||e)+(e&&e.stack?' | '+String(e.stack).split('\n').slice(0,3).join(' / '):''));
+      var b=$('boot');
+      if(b){
+        b.innerHTML='初期化エラー: '+esc(e&&e.message||e)+'<br><button type="button" class="big ghost" id="reloadBtn" style="width:100%">再読み込み</button>';
+        $('reloadBtn').onclick=function(){location.reload();};
+      }
+      $('diag').hidden=false;renderDiag();
     }
   })();
+  // 「v…」を長押し／タップで診断を表示（スクショで送ってもらう用）
+  $('ver').onclick=function(){var d=$('diag');d.hidden=!d.hidden;renderDiag();};
 })();
 </script>
 </body>
