@@ -85,7 +85,11 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
 .msg{padding:40px 20px;text-align:center;color:var(--sub);font-size:14px;line-height:1.7}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10;max-width:90vw}
 .toast.show{opacity:1}
-.ver{font-size:11px;color:var(--mute);text-align:center;padding:8px}
+.ver{font-size:11px;color:var(--mute);text-align:center;padding:8px;display:flex;justify-content:center;gap:12px;align-items:center}
+.famlink{border:1px solid var(--line);background:#fff;color:#46525F;border-radius:8px;font-size:12px;font-weight:700;height:32px;padding:0 12px}
+.urow{background:#fff;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.urow .nm{font-size:16px;font-weight:900}
+.urow .st{font-size:12px;color:var(--sub)}
 </style>
 </head>
 <body>
@@ -104,7 +108,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
     <div class="week" id="week"></div>
   </header>
   <main id="main"><div class="msg" id="boot">読み込み中…</div></main>
-  <div class="ver" id="ver"></div>
+  <div class="ver"><span id="ver"></span><button type="button" class="famlink" id="famlink" hidden>家族</button></div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -113,7 +117,7 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
   var DEV=new URLSearchParams(location.search).get('dev')||'';
   var COLORS={"英語":["#DCE8FB","#1D4E9E"],"数学":["#FCE4CF","#8F430A"],"国語":["#F8DDE1","#952237"],"理科":["#D8EFE0","#1C6436"],"社会":["#F5EBC4","#6E5200"],"体育":["#D3EEEE","#0B5E5E"],"音楽":["#EAE0F7","#55298A"],"美術":["#F7DEEE","#86245F"],"音美":["#EEEAF4","#4E3F66"],"技術":["#E3E7EC","#334050"],"家庭":["#E3E7EC","#334050"],"行事":["#FFF0D9","#7A4300"],"授業なし":["#F1F3F5","#8A96A1"]};
   var MARKS=['①','②','③','④','⑤','⑥'];
-  var S={tab:'tt',base:'',sel:'',school:null,overrides:{},daily:[],kinds:[],plans:{},state:null,form:null,editing:false,idToken:'',busy:false};
+  var S={role:'',users:null,tab:'tt',base:'',sel:'',school:null,overrides:{},daily:[],kinds:[],plans:{},state:null,form:null,editing:false,idToken:'',busy:false};
 
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -320,6 +324,27 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
       .catch(function(e){$('main').innerHTML='<div class="msg">読み込みエラー: '+esc(e.message)+'</div>';});
   }
 
+  // ---- 家族（オーナーのみ）----
+  var ROLE={owner:'父',parent:'親',child:'子'};
+  var STATUS={approved:'登録済み',pending:'承認待ち',rejected:'拒否'};
+  function renderFamily(){
+    var h='<div class="h">家族</div><div class="note">初回にアプリを開くと自動で記録されます。予定の家族（Takumi#6・しまだみほこ）は自動登録、それ以外はここで承認します。</div>';
+    if(!S.users){$('main').innerHTML=h+'<div class="msg">読み込み中…</div>';return;}
+    if(!S.users.length)h+='<div class="msg">まだ誰も開いていません</div>';
+    S.users.forEach(function(u){
+      h+='<div class="urow"><div class="nm">'+esc(u.display_name||'(名前なし)')+'</div><div class="st">'+esc(STATUS[u.status]||u.status)+(u.role?' · '+esc(ROLE[u.role]||u.role):'')+(u.notify?' · LINE通知あり':'')+'</div>';
+      if(u.status!=='approved')h+='<div class="grid3"><button type="button" class="tg" data-u="'+esc(u.user_id)+'" data-st="approved" data-role="parent">親として承認</button><button type="button" class="tg" data-u="'+esc(u.user_id)+'" data-st="approved" data-role="child">子として承認</button><button type="button" class="tg none" data-u="'+esc(u.user_id)+'" data-st="rejected">拒否</button></div>';
+      else h+='<div class="grid3"><button type="button" class="tg none" data-u="'+esc(u.user_id)+'" data-st="rejected">登録を外す</button></div>';
+      h+='</div>';
+    });
+    $('main').innerHTML=h;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-u]'),function(b){b.onclick=function(){
+      api('api/users/update',{user_id:b.getAttribute('data-u'),status:b.getAttribute('data-st'),role:b.getAttribute('data-role')||''})
+        .then(function(r){S.users=r.users;renderFamily();toast('更新しました');}).catch(function(e){toast('更新できませんでした: '+e.message);});
+    };});
+  }
+  function openFamily(){S.tab='fam';renderHeader();renderFamily();api('api/users').then(function(r){S.users=r.users;if(S.tab==='fam')renderFamily();}).catch(function(e){toast(e.message);});}
+
   // ---- ヘッダー ----
   function renderHeader(){
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab);});
@@ -332,8 +357,8 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
     $('week').innerHTML=h;
     Array.prototype.forEach.call(document.querySelectorAll('[data-day]'),function(b){b.onclick=function(){go(b.getAttribute('data-day'));};});
   }
-  function go(ymd){S.sel=ymd;S.form=null;S.editing=false;renderHeader();render();if(S.tab==='ck')loadState();}
-  function render(){if(S.tab==='tt')renderTimetable();else renderCheck();}
+  function go(ymd){if(S.tab==='fam')S.tab='tt';S.sel=ymd;S.form=null;S.editing=false;renderHeader();render();if(S.tab==='ck')loadState();}
+  function render(){if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else renderCheck();}
 
   $('prev').onclick=function(){go(addDays(S.sel,-1));};
   $('next').onclick=function(){go(addDays(S.sel,1));};
@@ -353,7 +378,13 @@ main{padding:16px 16px 40px;display:flex;flex-direction:column;gap:8px}
         if(!S.idToken||jwtExpired(S.idToken)){try{await liff.logout();}catch(e){}liff.login({redirectUri:location.href.split('#')[0]});return;}
       }
       var me=await api('auth/me');
-      if(!me.access_granted){$('boot').innerHTML='このLINEアカウントはまだ許可されていません。<br>下のIDを管理者に伝えてください。<br><b style="user-select:all;word-break:break-all">'+esc(me.user_id)+'</b>';return;}
+      if(!me.access_granted){
+        $('boot').innerHTML=me.status==='rejected'?'このLINEアカウントでは利用できません。':esc(me.name||'')+' さん、家族の登録を待っています。<br>お父さんに通知しました。承認されたら開き直してください。';
+        return;
+      }
+      S.role=me.role||'';
+      if(S.role==='owner'){$('famlink').hidden=false;$('famlink').onclick=openFamily;}
+      if(me.auto_registered)setTimeout(function(){toast(me.name+' さんを家族として登録しました');},600);
       var sc=await api('api/schedule');
       S.school=sc.school;S.overrides=sc.overrides||{};S.daily=sc.daily_items;S.kinds=sc.kinds;S.plans=sc.plans;
       var m=(sc.school.months||[]).filter(function(x){return x.dismissal_time;})[0];
