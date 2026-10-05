@@ -92,7 +92,10 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .mev{display:block;font-size:11px;line-height:1.35;padding:2px 0;border-top:1px solid #EEF1F4}
 .mev:first-of-type{border-top:0}
 .mev-d{font-size:10px;font-weight:700;color:var(--sub);margin-right:4px;white-space:nowrap}
+.mev.today{background:#FFF1C9;border-radius:5px;padding:3px 4px;margin:1px -3px;border-top-color:transparent}
+.mev.today+.mev{border-top-color:transparent}
 .mev.today .mev-d{color:#B42318}
+.mev.today .mev-t{font-weight:700}
 .mev-t{word-break:break-all}
 .mev-empty{font-size:11px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10;max-width:90vw}
@@ -252,16 +255,6 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   var IC_CLEAN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3l-4 9"/><path d="M6 13h10l2 8H4z"/><path d="M9 17v4"/><path d="M13 17v4"/></svg>';
   var IC_CHECK='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
 
-  function eventsHtml(ymd){
-    var d=dayOf(ymd);var evs=(d&&d.events||[]).slice();
-    if(d&&d.sc)evs.push('SC（スクールカウンセラー）来校');
-    if(!evs.length)return '<div class="note" style="padding:2px 0">この日の行事はありません</div>';
-    return evs.map(function(t){
-      var other=/[23]年/.test(t)&&!/1年/.test(t);
-      var warn=/持参|配布|テスト|部活動なし|下校/.test(t);
-      return '<div class="ev"><div class="dot" style="background:'+(warn?'#D9480F':other?'#AEB7C0':'')+'"></div><div class="t" style="color:'+(other?'#6B7682':'')+'">'+esc(t)+'</div>'+(other?'<div class="tag">他学年</div>':'')+'</div>';
-    }).join('');
-  }
 
   // 当月（表示日以降）と翌月の行事予定を左右2列で出す（2026-10-06）。
   // 当月は「3年：5校時まで」「進路面談（3年）」など明らかに他学年だけの予定を除く。翌月は予定表の欄をそのまま出す。
@@ -311,7 +304,6 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       h+='<div class="mini" style="background:'+(d.cleaning==='○'?'#E6ECF2':'#FFF3D6')+';color:'+(d.cleaning==='○'?'#2D3E50':'#6E4A00')+'"><div class="ic">'+IC_CLEAN+'</div><div class="lb">清掃</div><div class="tx">'+ct+'</div></div>';
     }
     h+=monthEventsHtml(ymd);
-    h+='<div class="h">行事・お知らせ</div>'+eventsHtml(ymd);
     $('main').innerHTML=h;
     Array.prototype.forEach.call(document.querySelectorAll('[data-otobi]'),function(b){
       b.onclick=function(){
