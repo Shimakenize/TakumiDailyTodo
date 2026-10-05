@@ -86,6 +86,15 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .goal b{font-size:16px;color:var(--ink)}
 .msg{padding:20px 12px;text-align:center;color:var(--sub);font-size:12px;line-height:1.6}
 #diag{margin:4px 8px;padding:6px 8px;background:#0F1720;color:#C9D3DB;border-radius:6px;font:10px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:45vh;overflow:auto}
+.mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:4px}
+.mcol{background:var(--card);border-radius:8px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.mhead{font-size:11px;font-weight:900;color:var(--teal);margin-bottom:1px}
+.mev{display:block;font-size:11px;line-height:1.35;padding:2px 0;border-top:1px solid #EEF1F4}
+.mev:first-of-type{border-top:0}
+.mev-d{font-size:10px;font-weight:700;color:var(--sub);margin-right:4px;white-space:nowrap}
+.mev.today .mev-d{color:#B42318}
+.mev-t{word-break:break-all}
+.mev-empty{font-size:11px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10;max-width:90vw}
 .toast.show{opacity:1}
 .ver{font-size:10px;color:var(--mute);text-align:center;padding:4px;display:flex;justify-content:center;gap:12px;align-items:center}
@@ -254,6 +263,33 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     }).join('');
   }
 
+  // 当月（表示日以降）と翌月の行事予定を左右2列で出す（2026-10-06）。
+  // 当月は「3年：5校時まで」「進路面談（3年）」など明らかに他学年だけの予定を除く。翌月は予定表の欄をそのまま出す。
+  function isOtherGrade(t){return /[23]年/.test(t)&&!/1年/.test(t);}
+  function monthEventsHtml(ymd){
+    if(!S.school)return '';
+    var ym=ymd.slice(0,7),mon=Number(ym.slice(5));
+    var cur=[];
+    Object.keys(S.school.days).sort().forEach(function(k){
+      if(k.slice(0,7)!==ym||k<ymd)return;
+      var evs=(S.school.days[k].events||[]).filter(function(t){return !isOtherGrade(t);});
+      if(evs.length)cur.push({d:mdw(k),t:evs.join(' / '),today:k===ymd});
+    });
+    var meta=(S.school.months||[]).filter(function(m){return m.month===ym;})[0];
+    var next=(meta&&meta.next_month_preview||[]).map(function(x){
+      var m=String(x).match(/^\s*([0-9]+\/[0-9]+\s*\([^)]*\)(?:\s*〜\s*[0-9/]*\s*\([^)]*\))?)\s*(.*)$/);
+      return m?{d:m[1].replace(/\s+/g,''),t:m[2]}:{d:'',t:String(x)};
+    });
+    if(!cur.length&&!next.length)return '';
+    function list(items,empty){
+      if(!items.length)return '<div class="mev-empty">'+empty+'</div>';
+      return items.map(function(e){return '<div class="mev'+(e.today?' today':'')+'"><span class="mev-d">'+esc(e.d)+'</span><span class="mev-t">'+esc(e.t)+'</span></div>';}).join('');
+    }
+    var nmon=mon===12?1:mon+1;
+    return '<div class="mgrid"><div class="mcol"><div class="mhead">'+mon+'月の行事（'+esc(md(ymd))+'〜）</div>'+list(cur,'予定なし')+'</div>'+
+      '<div class="mcol"><div class="mhead">'+nmon+'月の行事</div>'+list(next,meta?'予定なし':'予定表が未登録')+'</div></div>';
+  }
+
   function renderTimetable(){
     var ymd=S.sel,d=dayOf(ymd),h='';
     if(!d&&!isOff(ymd)){h+='<div class="msg">この日の予定表はまだ登録されていません</div>';}
@@ -274,6 +310,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       var ct={'○':'清掃あり','×':'清掃なし','△':'簡単清掃'}[d.cleaning]||'';
       h+='<div class="mini" style="background:'+(d.cleaning==='○'?'#E6ECF2':'#FFF3D6')+';color:'+(d.cleaning==='○'?'#2D3E50':'#6E4A00')+'"><div class="ic">'+IC_CLEAN+'</div><div class="lb">清掃</div><div class="tx">'+ct+'</div></div>';
     }
+    h+=monthEventsHtml(ymd);
     h+='<div class="h">行事・お知らせ</div>'+eventsHtml(ymd);
     $('main').innerHTML=h;
     Array.prototype.forEach.call(document.querySelectorAll('[data-otobi]'),function(b){
