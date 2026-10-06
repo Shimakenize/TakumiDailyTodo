@@ -151,15 +151,23 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     var rec={t:ms,step:step,msg:msg?String(msg).slice(0,500):''};
     LOGS.push(rec);
     var el=$('diag');if(el&&!el.hidden)renderDiag();
+    PENDING.push({step:step,ms:ms,msg:rec.msg,api_ms:extra&&extra.api_ms!==undefined?extra.api_ms:''});
+    // 起動の区切り・失敗のときだけまとめて送る（2026-10-06: 1件ずつ送ると GAS の同時実行が増え、本体の API を遅くしていた）
+    if(/^(boot_done|init_fail|api_fail|js_error|js_reject|state_fail|boot_retry_ok)$/.test(step))flushLogs();
+  }
+  var PENDING=[];var UA_SENT=false;
+  function flushLogs(){
+    if(!PENDING.length||CONFIG_URL.indexOf('https://')!==0)return;
+    var items=PENDING.splice(0,PENDING.length);
     try{
-      var body=Object.assign({_path:'api/client_log',sid:SID,step:step,ms:ms,msg:rec.msg,uid:LOG_UID,ver:APPV,
-        ua:LOGS.length===1?navigator.userAgent.slice(0,200):''},extra||{});
-      var payload=JSON.stringify(body);
-      if(CONFIG_URL.indexOf('https://')!==0)return;
+      var payload=JSON.stringify({_path:'api/client_log',sid:SID,uid:LOG_UID,ver:APPV,ua:UA_SENT?'':navigator.userAgent.slice(0,200),items:items});
+      UA_SENT=true;
       if(navigator.sendBeacon&&navigator.sendBeacon(CONFIG_URL,new Blob([payload],{type:'text/plain;charset=utf-8'})))return;
       fetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload,keepalive:true}).catch(function(){});
     }catch(e){}
   }
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushLogs();});
+  window.addEventListener('pagehide',flushLogs);
   function bootMsg(t){var b=$('boot');if(b)b.textContent=t;}
   function renderDiag(){
     var el=$('diag');if(!el)return;
@@ -189,7 +197,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     var t=Date.now(),n=0;
     return retryHtml(function(){
       n++;
-      return timedFetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)},path)
+      return timedFetch(CONFIG_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),_timeout:path==='api/boot'?45000:30000},path)
         .then(function(r){return parseJson(r,path);});
     }).then(function(j){
       if(j.error)throw new Error(j.error);
@@ -203,14 +211,15 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   // fetch が返らないまま待ち続けないよう 25 秒で打ち切る（GAS のコールドスタートは数秒〜十数秒）
   function timedFetch(url,opts,label){
     var ac=typeof AbortController!=='undefined'?new AbortController():null;
-    var timer=ac?setTimeout(function(){ac.abort();},25000):null;
+    var lim=(opts&&opts._timeout)||25000;
+    var timer=ac?setTimeout(function(){ac.abort();},lim):null;
     return fetch(url,Object.assign({},opts,ac?{signal:ac.signal}:{})).then(function(r){
       if(timer)clearTimeout(timer);
       if(!r.ok)clog('http_status',label+' HTTP '+r.status);
       return r;
     },function(e){
       if(timer)clearTimeout(timer);
-      throw new Error(label+(e&&e.name==='AbortError'?' が25秒で応答しません':' 通信エラー: '+(e&&e.message||e)));
+      throw new Error(label+(e&&e.name==='AbortError'?' が'+Math.round(lim/1000)+'秒で応答しません':' 通信エラー: '+(e&&e.message||e)));
     });
   }
   // GAS は再デプロイ直後の十数秒、JSON の代わりに Drive の「ページが見つかりません」HTML を返すことがある（2026-10-05 実測）。
@@ -362,7 +371,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       h+='<div class="note" style="margin-top:4px">送ったあと「すぐやる」に '+esc(S.daily.join('・'))+' が入ります。</div>';
       h+='<div class="h">今日の授業の宿題</div><div class="note">あるものを選んで、いつやるか決める。無ければ「なし」。</div>';
       st.subjects.forEach(function(n){
-        var s=f.subjects[n],c=col(n),ok=decided(s);if(!ok)pending++;
+        var s=f.subjects[n]||(f.subjects[n]={plan:'today'}),c=col(n),ok=decided(s);if(!ok)pending++;
         h+='<div class="card'+(ok?'':' todo')+'"><div class="shead"><div class="sname" style="background:'+c[0]+';color:'+c[1]+'">'+esc(n)+'</div><div class="state" style="color:'+(ok?'#1C6436':'#B25A00')+'">'+(ok?(hasTask(s)?'あり':'なし'):'未記入')+'</div></div><div class="grid3">';
         S.kinds.forEach(function(k){h+='<button type="button" class="tg'+(s[k]?' on':'')+'" data-subj="'+esc(n)+'" data-kind="'+esc(k)+'">'+esc(k)+'</button>';});
         h+='<button type="button" class="tg none'+(s.none?' on':'')+'" data-subj="'+esc(n)+'" data-kind="none">なし</button></div>';
@@ -428,7 +437,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     if(!silent){S.state=null;if(S.tab==='ck')renderCheck();}
     // 端末キャッシュで先に描画している間（LINE ログイン前）は問い合わせない。api/boot が今日分を入れる
     if(!DEV&&!S.idToken)return Promise.resolve();
-    return api('api/state',{date:ymd}).then(function(st){if(ymd!==S.sel)return;S.state=st;if(S.tab==='ck')renderCheck();})
+    return api('api/state',{date:ymd}).then(function(st){saveState(st);if(ymd!==S.sel)return;S.state=st;if(S.tab==='ck')renderCheck();})
       .catch(function(e){clog('state_fail',e.message);$('main').innerHTML='<div class="msg">読み込みエラー: '+esc(e.message)+'</div>';$('diag').hidden=false;renderDiag();});
   }
 
@@ -495,7 +504,9 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   var CACHE_KEY='tdt_boot_v1';
   function cacheLoad(){try{var c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');return c&&c.ver&&c.school?c:null;}catch(e){return null;}}
   function cacheSave(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){}}
-  function cacheClear(){try{localStorage.removeItem(CACHE_KEY);}catch(e){}}
+  function cacheClear(){try{localStorage.removeItem(CACHE_KEY);localStorage.removeItem('tdt_state_v1');}catch(e){}}
+  function saveState(st){try{if(st&&st.date)localStorage.setItem('tdt_state_v1',JSON.stringify(st));}catch(e){}}
+  function loadSavedState(ymd){try{var st=JSON.parse(localStorage.getItem('tdt_state_v1')||'null');return st&&st.date===ymd?st:null;}catch(e){return null;}}
   function applySchool(sc){
     S.school=sc.school;S.overrides=sc.overrides||{};S.daily=sc.daily_items;S.kinds=sc.kinds;S.plans=sc.plans;
     var m=(sc.school.months||[]).filter(function(x){return x.dismissal_time;})[0];
@@ -522,6 +533,27 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     $('reloadBtn').onclick=function(){location.reload();};
     $('diag').hidden=false;renderDiag();
   }
+  // サーバー（GAS）が遅い時間帯がある（2026-10-06 実測: 空の config でも 2〜11 秒、boot 25 秒超え）。
+  // 端末の保存分で表示できているときは止めずに、上部に小さく出して再試行する
+  function showBanner(t){
+    var b=$('netbanner');
+    if(!b){$('main').insertAdjacentHTML('afterbegin','<div id="netbanner" class="note" style="background:#FFF3D6;color:#6E4A00;border-radius:6px;padding:4px 8px"></div>');b=$('netbanner');}
+    b.textContent=t;
+  }
+  function hideBanner(){var b=$('netbanner');if(b)b.parentNode.removeChild(b);}
+  async function bootWithRetry(today,cache){
+    var waits=[0,3000,8000];
+    for(var i=0;i<waits.length;i++){
+      if(waits[i]){showBanner('サーバーの応答が遅れています。前回の内容を表示中… 再試行 '+i+'/'+(waits.length-1));await new Promise(function(r){setTimeout(r,waits[i]);});}
+      try{
+        var bt=await api('api/boot',{date:today,school_ver:cache?cache.ver:''});
+        if(i>0)clog('boot_retry_ok','try '+(i+1));
+        return bt;
+      }catch(e){
+        if(!started||i===waits.length-1||/未許可|登録されていません|id_token/.test(e.message))throw e;
+      }
+    }
+  }
   (async function main(){
     try{
       clog('boot',location.pathname+location.search.replace(/dev=[^&]*/,'dev=***').replace(/code=[^&]*/,'code=***'));
@@ -529,8 +561,10 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       if(cache){
         applySchool(cache);applyRole(cache.role);
         if(cache.appv){APPV=cache.appv;$('ver').textContent='v'+APPV;}
+        var saved=loadSavedState(jstToday());
+        if(saved)S.state=saved;
         startUi();
-        clog('cache_render','ver '+cache.ver);
+        clog('cache_render','ver '+cache.ver+(saved?' +state':''));
       }
       var liffId='';try{liffId=localStorage.getItem('tdt_liff_id')||'';}catch(e){}
       var cfgP=getConfig().then(function(c){
@@ -564,7 +598,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       }
       bootMsg('アカウントを確認中…');
       var today=jstToday();
-      var bt=await api('api/boot',{date:today,school_ver:cache?cache.ver:''});
+      var bt=await bootWithRetry(today,cache);
       var me=bt.me;
       LOG_UID=me.user_id||LOG_UID;
       if(!me.access_granted){
@@ -577,6 +611,8 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       var sc=bt.schedule;
       if(sc.school){applySchool(sc);}else{S.overrides=sc.overrides||{};}
       cacheSave({ver:bt.school_ver,school:S.school,overrides:S.overrides,daily_items:S.daily,kinds:S.kinds,plans:S.plans,role:S.role,appv:APPV});
+      saveState(bt.state);
+      hideBanner();
       if(S.sel===today||!started)S.state=bt.state;
       if(!started)startUi();
       else{renderHeader();render();}
@@ -584,7 +620,8 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       clog('boot_done','total '+(Date.now()-T0)+'ms school '+(sc.school?'sent':'cached'));
     }catch(e){
       clog('init_fail',(e&&e.message||e)+(e&&e.stack?' | '+String(e.stack).split('\n').slice(0,3).join(' / '):''));
-      showFatal(e&&e.message||e);
+      if(started){showBanner('サーバーにつながりません（前回の内容を表示中）: '+(e&&e.message||e)+' — 下の v… をタップで診断');}
+      else showFatal(e&&e.message||e);
     }
   })();
   // 「v…」を長押し／タップで診断を表示（スクショで送ってもらう用）
