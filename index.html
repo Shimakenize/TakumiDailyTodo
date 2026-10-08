@@ -86,6 +86,19 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .goal b{font-size:16px;color:var(--ink)}
 .msg{padding:20px 12px;text-align:center;color:var(--sub);font-size:12px;line-height:1.6}
 #diag{margin:4px 8px;padding:6px 8px;background:#0F1720;color:#C9D3DB;border-radius:6px;font:10px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:45vh;overflow:auto}
+.wk{display:grid;grid-template-columns:18px repeat(5,minmax(0,1fr));gap:2px;background:var(--card);border-radius:8px;padding:4px}
+.wk-c{min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:5px;font-size:12px;font-weight:900;line-height:1.1;height:30px;padding:0 1px;overflow:hidden;border:0}
+.wk-lab{font-size:11px;color:var(--sub);font-weight:700;height:auto;min-height:18px}
+.wk-h{flex-direction:column;height:34px;background:#EEF1F4;color:var(--ink);gap:0}
+.wk-h b{font-size:14px;line-height:1}
+.wk-h span{font-size:10px;font-weight:700}
+.wk-h.today{background:var(--teal);color:#fff}
+.wk-s.otobi{border:1.5px dashed currentColor;font-family:inherit}
+.wk-m{height:22px;font-size:11px;font-weight:700;background:#EEF3F1;color:#1F4F3E}
+.wk-m.warn{background:#FFE7C2;color:#7A3E00}
+.wk-off{height:auto;flex-direction:column;background:#F1F3F5;color:var(--mute);font-size:11px;writing-mode:vertical-rl;letter-spacing:.1em}
+.wk-c.today:not(.wk-h){box-shadow:inset 0 0 0 2px var(--teal)}
+.wk-c.past{opacity:.35;filter:grayscale(1)}
 .mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:4px}
 .mcol{background:var(--card);border-radius:8px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .mhead{font-size:11px;font-weight:900;color:var(--teal);margin-bottom:1px}
@@ -268,14 +281,15 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   // 当月（表示日以降）と翌月の行事予定を左右2列で出す（2026-10-06）。
   // 当月は「3年：5校時まで」「進路面談（3年）」など明らかに他学年だけの予定を除く。翌月は予定表の欄をそのまま出す。
   function isOtherGrade(t){return /[23]年/.test(t)&&!/1年/.test(t);}
-  function monthEventsHtml(ymd){
+  function monthEventsHtml(ymd,hl){
     if(!S.school)return '';
+    hl=hl||ymd;
     var ym=ymd.slice(0,7),mon=Number(ym.slice(5));
     var cur=[];
     Object.keys(S.school.days).sort().forEach(function(k){
       if(k.slice(0,7)!==ym||k<ymd)return;
       var evs=(S.school.days[k].events||[]).filter(function(t){return !isOtherGrade(t);});
-      if(evs.length)cur.push({d:mdw(k),t:evs.join(' / '),today:k===ymd});
+      if(evs.length)cur.push({d:mdw(k),t:evs.join(' / '),today:k===hl});
     });
     var meta=(S.school.months||[]).filter(function(m){return m.month===ym;})[0];
     var next=(meta&&meta.next_month_preview||[]).map(function(x){
@@ -292,38 +306,71 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       '<div class="mcol"><div class="mhead">'+nmon+'月の行事</div>'+list(next,meta?'予定なし':'予定表が未登録')+'</div></div>';
   }
 
+  // ---- 時間割（1週間 月〜金。2026-10-09）----
+  // 表示週は選択日を含む週。土日を選んでいるときは翌週。過ぎた日はグレー、今日は強調
+  function weekMonday(ymd){
+    var w='月火水木金土日'.indexOf(dowOf(ymd));
+    return w>=5?addDays(ymd,7-w):addDays(ymd,-w);
+  }
+  var SHORT={'授業なし':'—','行事':'行事'};
   function renderTimetable(){
-    var ymd=S.sel,d=dayOf(ymd),h='';
-    if(!d&&!isOff(ymd)){h+='<div class="msg">この日の予定表はまだ登録されていません</div>';}
-    else if(isOff(ymd)){h+='<div class="off-card"><b>お休み</b><div class="note">'+(/[土日]/.test(dowOf(ymd))?'週末':'祝日')+'</div></div>';}
-    else{
-      periodsOf(ymd).forEach(function(p,i){
-        var c=col(p.name);
-        var chip=p.otobi
-          ?'<button type="button" class="chip otobi" data-otobi="'+p.no+'" style="background:'+c[0]+';color:'+c[1]+'"><span>'+esc(p.name)+'</span><small>'+(p.name==='音美'?'タップで決定':'変更')+'</small></button>'
-          :'<div class="chip" style="background:'+c[0]+';color:'+c[1]+'">'+esc(p.name)+'</div>';
-        h+='<div class="prow"><div class="pno">'+MARKS[i]+'</div>'+chip+'<div class="code">'+(/^\d+$/.test(p.code||'')?'#'+p.code:'')+'</div></div>';
-        if(i===3){
-          var lt={'○':'給食','△':'昼食持参','?':'？（予定表が空欄）'}[d.lunch]||'';
-          var warn=d.lunch!=='○';
-          h+='<div class="mini" style="background:'+(warn?'#FFE7C2':'#E6F0EC')+';color:'+(warn?'#7A3E00':'#1F4F3E')+'"><div class="ic">'+IC_LUNCH+'</div><div class="lb">昼</div><div class="tx">'+lt+'</div></div>';
+    var mon=weekMonday(S.sel),today=S.base,h='';
+    var days=[0,1,2,3,4].map(function(i){return addDays(mon,i);});
+    var head='<div class="wk-c wk-lab"></div>';
+    days.forEach(function(y){
+      var cls=y===today?' today':(y<today?' past':'');
+      head+='<div class="wk-c wk-h'+cls+'"><b>'+Number(y.slice(8))+'</b><span>'+dowOf(y)+'</span></div>';
+    });
+    var rows=[];
+    for(var i=0;i<6;i++){
+      rows.push({lab:MARKS[i],kind:'p',idx:i});
+      if(i===3)rows.push({lab:'昼',kind:'lunch'});
+    }
+    rows.push({lab:'清',kind:'clean'});
+    var body='';
+    var offDone={};
+    rows.forEach(function(r,ri){
+      body+='<div class="wk-c wk-lab">'+r.lab+'</div>';
+      days.forEach(function(y){
+        var d=dayOf(y),cls=(y===today?' today':(y<today?' past':''));
+        if(!d||d.holiday||isOff(y)){
+          // 休み・未登録の日は列全体を1つのセルにする（最初の行だけ出力し、行をまたいで縦に伸ばす）
+          if(offDone[y])return;
+          offDone[y]=true;
+          var lab=d&&d.holiday?((d.events||[])[0]||'休み'):(d?'休み':'未登録');
+          body+='<div class="wk-c wk-off'+cls+'" style="grid-row:span '+rows.length+'">'+esc(lab)+'</div>';
+          return;
+        }
+        if(r.kind==='p'){
+          var p=periodsOf(y)[r.idx];
+          if(!p){body+='<div class="wk-c'+cls+'"></div>';return;}
+          var c=col(p.name),nm=SHORT[p.name]||p.name;
+          if(p.otobi)body+='<button type="button" class="wk-c wk-s otobi'+cls+'" data-otobi="'+p.no+'" data-date="'+y+'" style="background:'+c[0]+';color:'+c[1]+'">'+esc(nm)+'</button>';
+          else body+='<div class="wk-c wk-s'+cls+'" style="background:'+c[0]+';color:'+c[1]+'">'+esc(nm)+'</div>';
+        }else if(r.kind==='lunch'){
+          var lt={'○':'給食','△':'弁当','?':'？'}[d.lunch]||'';
+          body+='<div class="wk-c wk-m'+(d.lunch!=='○'?' warn':'')+cls+'">'+lt+'</div>';
+        }else{
+          var ct={'○':'あり','×':'なし','△':'簡単'}[d.cleaning]||'';
+          body+='<div class="wk-c wk-m'+(d.cleaning!=='○'?' warn':'')+cls+'">'+ct+'</div>';
         }
       });
-      var ct={'○':'清掃あり','×':'清掃なし','△':'簡単清掃'}[d.cleaning]||'';
-      h+='<div class="mini" style="background:'+(d.cleaning==='○'?'#E6ECF2':'#FFF3D6')+';color:'+(d.cleaning==='○'?'#2D3E50':'#6E4A00')+'"><div class="ic">'+IC_CLEAN+'</div><div class="lb">清掃</div><div class="tx">'+ct+'</div></div>';
-    }
-    h+=monthEventsHtml(ymd);
+    });
+    h+='<div class="wk">'+head+body+'</div>';
+    h+='<div class="note" style="margin-top:2px">音美はタップで 音美→音楽→美術</div>';
+    h+=monthEventsHtml(mon>today?mon:today,today);
     $('main').innerHTML=h;
     Array.prototype.forEach.call(document.querySelectorAll('[data-otobi]'),function(b){
       b.onclick=function(){
-        var no=b.getAttribute('data-otobi');var key=S.sel+'#'+no;
+        var no=b.getAttribute('data-otobi'),y=b.getAttribute('data-date');var key=y+'#'+no;
         var order=['音美','音楽','美術'];var cur=S.overrides[key]||'音美';
         var nxt=order[(order.indexOf(cur)+1)%3];
         S.overrides[key]=nxt;renderTimetable();
-        api('api/override',{date:S.sel,period:Number(no),subject:nxt}).catch(function(e){toast('保存できませんでした: '+e.message);});
+        api('api/override',{date:y,period:Number(no),subject:nxt}).catch(function(e){toast('保存できませんでした: '+e.message);});
       };
     });
   }
+
 
   // ---- 帰宅チェック ----
   function blankForm(){
@@ -466,9 +513,15 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   function renderHeader(){
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab);});
     var diff=Math.round((Date.parse(S.sel)-Date.parse(S.base))/864e5);
-    $('rel').textContent={0:'今日',1:'明日','-1':'きのう'}[diff]||'';
     var w=dowOf(S.sel);
-    $('md').innerHTML=esc(md(S.sel))+'<small style="color:'+(w==='日'?'#FF9C9C':w==='土'?'#9CC7FF':'#fff')+'">（'+w+'）</small>';
+    if(S.tab==='tt'){
+      var wm=weekMonday(S.sel),bm=weekMonday(S.base),wd=Math.round((Date.parse(wm)-Date.parse(bm))/(7*864e5));
+      $('rel').textContent={0:'今週',1:'来週','-1':'先週'}[wd]||'';
+      $('md').innerHTML=esc(md(wm))+'<small>〜'+esc(md(addDays(wm,4)))+'</small>';
+    }else{
+      $('rel').textContent={0:'今日',1:'明日','-1':'きのう'}[diff]||'';
+      $('md').innerHTML=esc(md(S.sel))+'<small style="color:'+(w==='日'?'#FF9C9C':w==='土'?'#9CC7FF':'#fff')+'">（'+w+'）</small>';
+    }
     var dIdx='月火水木金土日'.indexOf(w),mon=addDays(S.sel,-dIdx),h='';
     for(var i=0;i<7;i++){var y=addDays(mon,i);h+='<button type="button" data-day="'+y+'" class="'+(y===S.sel?'sel ':'')+(y===S.base?'base ':'')+(isOff(y)?'off':'')+'"><span>'+dowOf(y)+'</span><span>'+Number(y.slice(8))+'</span></button>';}
     $('week').innerHTML=h;
@@ -492,8 +545,8 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
   }
   function render(){if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else if(S.tab==='db')renderDashboard();else renderCheck();}
 
-  $('prev').onclick=function(){go(addDays(S.sel,-1));};
-  $('next').onclick=function(){go(addDays(S.sel,1));};
+  $('prev').onclick=function(){go(addDays(S.sel,S.tab==='tt'?-7:-1));};
+  $('next').onclick=function(){go(addDays(S.sel,S.tab==='tt'?7:1));};
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.onclick=function(){S.tab=b.getAttribute('data-tab');renderHeader();render();if(S.tab==='ck')loadState();if(S.tab==='db')openDashboard();};});
 
   // ---- 起動 ----
