@@ -124,6 +124,9 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .sc-seg{min-height:0;overflow:hidden;font-size:9px;line-height:1.15;padding:1px 3px;display:flex;align-items:flex-start}
 .sc-seg.pre{background:#EEF1F4;color:#46525F}
 .sc-seg.dep{background:#FFF1C9;color:#6E4A00}
+.sc-seg.gap{background:transparent}
+.sc-blk.trg{background:transparent;box-shadow:none}
+.sc-blk.trg .sc-seg:not(.gap){box-shadow:0 0 0 1px rgba(23,33,43,.08)}
 .sc-seg.post{background:#F1F3F5;color:#6B7682}
 .sc-seg.main{flex-direction:column;font-size:10px;font-weight:700;padding:2px 3px;gap:1px}
 .sc-seg.main .t{font-size:10px;font-weight:900}
@@ -182,6 +185,8 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 <script>
 (function(){
   var CONFIG_URL='https://script.google.com/macros/s/AKfycbz5CbyoyJLffe1sB-ANP66I3nyZYV78LhFGhYDhFUR6mYxtNdSHGYyijnwKZtecuEZL4A/exec';
+  // 画面の版。GAS の APP_VERSION と違えば（開きっぱなしの古い画面）1回だけ読み込み直す
+  var UI_BUILD='0.6.1';
   var DEV=new URLSearchParams(location.search).get('dev')||'';
   var COLORS={"英語":["#DCE8FB","#1D4E9E"],"数学":["#FCE4CF","#8F430A"],"国語":["#F8DDE1","#952237"],"理科":["#D8EFE0","#1C6436"],"社会":["#F5EBC4","#6E5200"],"体育":["#D3EEEE","#0B5E5E"],"音楽":["#EAE0F7","#55298A"],"美術":["#F7DEEE","#86245F"],"音美":["#EEEAF4","#4E3F66"],"技術":["#E3E7EC","#334050"],"家庭":["#E3E7EC","#334050"],"行事":["#FFF0D9","#7A4300"],"授業なし":["#F1F3F5","#8A96A1"]};
   var MARKS=['①','②','③','④','⑤','⑥'];
@@ -671,6 +676,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     var h0=hi>lo?Math.max(6,Math.floor(lo/60)):8,h1=hi>lo?Math.min(23,Math.max(h0+4,Math.ceil((hi+40)/60))):22;
     var groups={};cols.forEach(function(c){groups[c]=[];});
     evs.forEach(function(e){var k=catKey(e.category_code);if(k==='all')k='U-15';if(groups[k])groups[k].push(e);});
+    cols.forEach(function(c){groups[c]=collapseGroup(groups[c],'TR');groups[c]=collapseGroup(groups[c],'futsal');});
     var maxN=Math.max.apply(null,cols.map(function(c){return groups[c].length;}).concat([1]));
     var CH=Math.max(380,Math.min(640,(h1-h0)*34));
     var PT=18,PB=10;
@@ -699,19 +705,19 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       var placed=[];list.forEach(function(it){var ln=0;while(placed.some(function(p){return p.lane===ln&&p.ds<it.de&&it.ds<p.de;}))ln++;it.lane=ln;placed.push(it);});
       var lanes=Math.max(1,placed.reduce(function(a,p){return Math.max(a,p.lane+1);},1));
       var blocks=placed.map(function(it){
-        var top=y(it.ds),ht=Math.max(30,y(it.de)-top),w=100/lanes,kc=KIND_COL[it.e.event_kind]||['#EEF0F3','#46525F',it.e.event_kind||''];
-        var core=it.r.core,inner='',cur=it.ds;
-        var pre=tlMarks(tlPre(it.e)).filter(function(x){return x.m<core.start;}).sort(function(a,b){return a.m-b.m;});
-        pre.forEach(function(p,i){var nx=i+1<pre.length?pre[i+1].m:core.start;var a=Math.max(cur,it.ds),b=Math.min(nx,it.de,core.start);
-          if(b>a)inner+='<div class="sc-seg '+(/出発/.test(p.label)?'dep':'pre')+'" style="flex:'+Math.max(1,b-a)+' 1 0">'+esc(hm(p.m)+(p.label||'集合'))+'</div>';cur=Math.max(cur,nx);});
-        var ms=Math.max(it.ds,core.start),me=Math.min(it.de,core.end);
-        var sub=it.e.event_kind==='match'?('vs '+(it.e.title||'')):(it.e.title||'');
-        if(me>ms)inner+='<div class="sc-seg main" style="flex:'+Math.max(1,me-ms)+' 1 0;background:'+kc[0]+';color:'+kc[1]+'"><span class="t">'+esc(hm(core.start)+'-'+hm(core.end))+'</span><span>'+esc(kc[2]+' '+sub)+'</span>'+(it.e.venue?'<span class="v">'+esc(it.e.venue)+'</span>':'')+'</div>';
-        var post=tlMarks(tlPost(it.e)).filter(function(x){return x.m>core.end;}).sort(function(a,b){return a.m-b.m;});
-        post.forEach(function(p,i){var a=i?post[i-1].m:core.end,b=p.m,qa=Math.max(a,it.ds),qb=Math.min(b,it.de);
-          if(qb>qa)inner+='<div class="sc-seg post" style="flex:'+Math.max(1,qb-qa)+' 1 0">'+esc(hm(p.m)+(p.label||'解散'))+'</div>';});
+        var top=y(it.ds),ht=Math.max(30,y(it.de)-top),w=100/lanes;
+        var isTrGroup=it.e.event_kind==='TR'&&it.e.groupEvents&&it.e.groupEvents.length>1;
+        var inner='';
+        if(isTrGroup){
+          var cur=it.ds;
+          it.e.groupEvents.forEach(function(se){
+            var r=tlRange(se);if(!r)return;var a=Math.max(it.ds,r.start),b=Math.min(it.de,r.end);if(b<=a)return;
+            if(a>cur)inner+='<div class="sc-seg gap" style="flex:'+Math.max(1,a-cur)+' 1 0"></div>';
+            inner+=blockInner(se,r,a,b);cur=Math.max(cur,b);
+          });
+        }else inner=blockInner(it.e,it.r,it.ds,it.de);
         SC_EV.push(it.e);
-        return '<div class="sc-blk'+(isCancelled(it.e)?' cancel':'')+'" data-ev="'+(SC_EV.length-1)+'" style="top:'+top+'px;height:'+ht+'px;left:calc('+(it.lane*w)+'% + 1px);width:calc('+w+'% - 2px)">'+inner+'</div>';
+        return '<div class="sc-blk'+(isCancelled(it.e)?' cancel':'')+(isTrGroup?' trg':'')+'" data-ev="'+(SC_EV.length-1)+'" style="top:'+top+'px;height:'+ht+'px;left:calc('+(it.lane*w)+'% + 1px);width:calc('+w+'% - 2px)">'+inner+'</div>';
       }).join('');
       var cc=CAT_COL[c];
       return '<div class="sc-col" style="flex:'+lanes+' 1 0"><div class="sc-colh" style="background:'+cc[0]+';color:'+cc[1]+'">'+c+'</div><div class="sc-canvas" style="height:'+CH+'px">'+grid+now+blocks+'</div></div>';
@@ -723,19 +729,77 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     // 前後の週も先読み（日送りで週をまたいだときすぐ出す）
     if(d&&d._fresh){var dw='月火水木金土日'.indexOf(dowOf(ymd));if(dw>=5)loadRegalia(off+1);if(dw===0)loadRegalia(off-1);}
   }
+  // 集合・出発 → 本体 → 解散 の帯（ds〜de の範囲に切って時間比例で積む）
+  function blockInner(e,rng,ds,de){
+    var kc=KIND_COL[e.event_kind]||['#EEF0F3','#46525F',e.event_kind||''];
+    var core=rng.core,inner='',cur=ds;
+    var pre=tlMarks(tlPre(e)).filter(function(x){return x.m<core.start;}).sort(function(a,b){return a.m-b.m;});
+    pre.forEach(function(p,i){var nx=i+1<pre.length?pre[i+1].m:core.start;var a=Math.max(cur,ds),b=Math.min(nx,de,core.start);
+      if(b>a)inner+='<div class="sc-seg '+(/出発/.test(p.label)?'dep':'pre')+'" style="flex:'+Math.max(1,b-a)+' 1 0">'+esc(hm(p.m)+(p.label||'集合'))+'</div>';cur=Math.max(cur,nx);});
+    var ms=Math.max(ds,core.start),me=Math.min(de,core.end);
+    var grp=e.groupEvents&&e.groupEvents.length>1&&e.event_kind!=='TR';
+    var sub=grp?(e.league_or_competition||'フットサル'):(e.event_kind==='match'?('vs '+(e.title||'')):(e.title||''));
+    var lines=grp?e.groupEvents.map(function(g){var c=tlCore(g.event_time);var nm=String(g.title||'').trim();return (c?hm(c.start)+'-'+hm(c.end)+' ':'')+(nm?'vs '+(nm.length>4?nm.slice(0,4)+'…':nm):'');}).join('\n'):'';
+    var w=Math.max(1,me-ms)*(grp?e.groupEvents.length:1);
+    if(me>ms)inner+='<div class="sc-seg main" style="flex:'+w+' 1 0;background:'+kc[0]+';color:'+kc[1]+'"><span class="t">'+esc(hm(core.start)+'-'+hm(core.end))+'</span><span>'+esc(kc[2]+' '+sub)+'</span>'+
+      (lines?'<span class="v" style="white-space:pre-line">'+esc(lines)+'</span>':'')+(e.venue?'<span class="v">'+esc(e.venue)+'</span>':'')+'</div>';
+    var post=tlMarks(tlPost(e)).filter(function(x){return x.m>core.end;}).sort(function(a,b){return a.m-b.m;});
+    post.forEach(function(p,i){var a=i?post[i-1].m:core.end,b=p.m,qa=Math.max(a,ds),qb=Math.min(b,de);
+      if(qb>qa)inner+='<div class="sc-seg post" style="flex:'+Math.max(1,qb-qa)+' 1 0">'+esc(hm(p.m)+(p.label||'解散'))+'</div>';});
+    return inner;
+  }
+  // 同日・同カテゴリ列の中で、TR（2部練習など）は1本に連結、フットサルの複数試合は1枚に併合（ChkMatch・親アプリと同じ方針。DB は個別のまま）
+  function isFutsal(e){var s=String(e.league_or_competition||'')+' '+String(e.title||'');return /フットサル/.test(s)||/U-?\d+FL\b/i.test(s);}
+  function uniq(a){var seen={},o=[];a.forEach(function(x){x=String(x||'').trim();if(x&&!seen[x]){seen[x]=1;o.push(x);}});return o;}
+  function collapseGroup(list,mode){
+    var hit=function(e){return mode==='TR'?e.event_kind==='TR':(e.event_kind==='match'&&isFutsal(e));};
+    var byCat={};list.forEach(function(e){if(hit(e)){var k=catKey(e.category_code);(byCat[k]=byCat[k]||[]).push(e);}});
+    var merged={};
+    Object.keys(byCat).forEach(function(k){
+      var rows=byCat[k];if(rows.length<2)return;
+      rows=rows.slice().sort(function(a,b){var ca=tlCore(a.event_time),cb=tlCore(b.event_time);return (ca?ca.start:0)-(cb?cb.start:0);});
+      var rs=rows.map(mode==='TR'?tlRange:function(e){return tlCore(e.event_time);}).filter(Boolean);
+      var a=Math.min.apply(null,rs.map(function(r){return r.start;})),b=Math.max.apply(null,rs.map(function(r){return r.end;}));
+      var f=rows[0];
+      merged[k]=mode==='TR'
+        ?{id:f.id,event_date:f.event_date,event_kind:'TR',title:'練習',venue:uniq(rows.map(function(e){return e.venue;})).join(' / '),event_time:hm(a)+'-'+hm(b),category_code:f.category_code,display_status:f.display_status,groupEvents:rows}
+        :{id:f.id,event_date:f.event_date,event_kind:'match',title:'',league_or_competition:uniq(rows.map(function(e){return e.league_or_competition;})).join(' / ')||'フットサルリーグ',
+          venue:uniq(rows.map(function(e){return e.venue;})).join(' / '),event_time:hm(a)+'-'+hm(b),category_code:f.category_code,display_status:f.display_status,
+          pre_event_coach:f.pre_event_coach,pre_event_user:f.pre_event_user,post_event_coach:rows[rows.length-1].post_event_coach,post_event_user:rows[rows.length-1].post_event_user,groupEvents:rows};
+    });
+    if(!Object.keys(merged).length)return list;
+    var out=[],placed={};
+    list.forEach(function(e){if(!hit(e)){out.push(e);return;}var k=catKey(e.category_code);if(!merged[k]){out.push(e);return;}if(!placed[k]){out.push(merged[k]);placed[k]=1;}});
+    return out;
+  }
   function bindSc(){
     var sw=$('scU13');if(sw)sw.onclick=function(){SC_U13=!SC_U13;try{localStorage.setItem('tdt_sc_u13',SC_U13?'1':'0');}catch(e){}renderSchedule();};
     Array.prototype.forEach.call(document.querySelectorAll('.sc-blk'),function(b){b.onclick=function(){showEvDetail(SC_EV[+b.getAttribute('data-ev')]);};});
   }
+  function detailHtml(e){
+    var kc=KIND_COL[e.event_kind]||['','',e.event_kind||''];
+    var rows=[['日付',mdw(String(e.event_date).slice(0,10))],['時間',e.event_time],['種別',kc[2]],['カテゴリ',e.category_code],
+      ['内容',e.event_kind==='match'?('vs '+(e.title||'')):e.title],['大会',e.league_or_competition],['対戦',e.regalia_match_text],['集合（コーチ）',e.pre_event_coach],['出発（家）',e.pre_event_user],
+      ['解散（コーチ）',e.post_event_coach],['解散後（家）',e.post_event_user],['会場',e.venue],['メモ',e.notes],['状態',isCancelled(e)?'中止・削除':'']]
+      .filter(function(r){return r[1];});
+    return '<h3>'+esc(kc[2]+' '+(e.title||''))+'</h3><dl>'+rows.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd>';}).join('')+'</dl>';
+  }
   function showEvDetail(e){
     if(!e)return;
+    if(e.groupEvents&&e.groupEvents.length>1){
+      var parts=e.groupEvents;
+      var m0=document.createElement('div');m0.className='sc-modal';
+      m0.innerHTML='<div class="sc-sheet">'+parts.map(function(g){return detailHtml(g);}).join('<hr style="border:0;border-top:1px solid #EEF1F4;margin:10px 0">')+'<button type="button" class="big ghost" style="width:100%;margin-top:10px">閉じる</button></div>';
+      m0.onclick=function(ev){if(ev.target===m0||ev.target.tagName==='BUTTON')m0.parentNode.removeChild(m0);};
+      document.body.appendChild(m0);return;
+    }
     var kc=KIND_COL[e.event_kind]||['','',e.event_kind||''];
     var rows=[['日付',mdw(String(e.event_date).slice(0,10))],['時間',e.event_time],['種別',kc[2]],['カテゴリ',e.category_code],
       ['内容',e.event_kind==='match'?('vs '+(e.title||'')):e.title],['大会',e.league_or_competition],['対戦',e.regalia_match_text],['集合（コーチ）',e.pre_event_coach],['出発（家）',e.pre_event_user],
       ['解散（コーチ）',e.post_event_coach],['解散後（家）',e.post_event_user],['会場',e.venue],['メモ',e.notes],['状態',isCancelled(e)?'中止・削除':'']]
       .filter(function(r){return r[1];});
     var m=document.createElement('div');m.className='sc-modal';
-    m.innerHTML='<div class="sc-sheet"><h3>'+esc(kc[2]+' '+(e.title||''))+'</h3><dl>'+rows.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd>';}).join('')+'</dl><button type="button" class="big ghost" style="width:100%;margin-top:10px">閉じる</button></div>';
+    m.innerHTML='<div class="sc-sheet">'+detailHtml(e)+'<button type="button" class="big ghost" style="width:100%;margin-top:10px">閉じる</button></div>';
     m.onclick=function(ev){if(ev.target===m||ev.target.tagName==='BUTTON')m.parentNode.removeChild(m);};
     document.body.appendChild(m);
   }
@@ -867,6 +931,11 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
         return;
       }
       applyRole(me.role);
+      if(bt.app_version&&bt.app_version!==UI_BUILD){
+        var rk='tdt_reloaded_'+bt.app_version,done=false;try{done=sessionStorage.getItem(rk)==='1';sessionStorage.setItem(rk,'1');}catch(e){}
+        clog('version_mismatch','ui '+UI_BUILD+' gas '+bt.app_version+(done?' (skip)':' -> reload'));
+        if(!done){flushLogs();location.replace(location.pathname+'?v='+Date.now());return;}
+      }
       if(me.auto_registered)setTimeout(function(){toast(me.name+' さんを家族として登録しました');},600);
       var sc=bt.schedule;
       if(sc.school){applySchool(sc);}else{S.overrides=sc.overrides||{};}
