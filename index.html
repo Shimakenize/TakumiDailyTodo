@@ -15,8 +15,8 @@ button{font-family:inherit;cursor:pointer}
 .app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 header{background:var(--ink);color:#fff;padding:8px 10px 8px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;z-index:5}
 .toprow{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#B8C4CF;letter-spacing:.04em}
-.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:#26323E;padding:3px;border-radius:9px}
-.seg button{height:32px;border:0;border-radius:7px;font-size:13px;font-weight:700;background:transparent;color:#B8C4CF}
+.seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;background:#26323E;padding:3px;border-radius:9px}
+.seg button{height:32px;border:0;border-radius:7px;font-size:12px;white-space:nowrap;padding:0 2px;letter-spacing:-.02em;font-weight:700;background:transparent;color:#B8C4CF}
 .seg button.on{background:#fff;color:var(--ink)}
 .daynav{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .round{width:34px;height:34px;border-radius:17px;border:1px solid #3A4856;background:transparent;color:#fff;display:flex;align-items:center;justify-content:center}
@@ -99,6 +99,43 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 .wk-off{height:auto;flex-direction:column;background:#F1F3F5;color:var(--mute);font-size:11px;writing-mode:vertical-rl;letter-spacing:.1em}
 .wk-c.today:not(.wk-h){box-shadow:inset 0 0 0 2px var(--teal)}
 .wk-c.past{opacity:.35;filter:grayscale(1)}
+.sc-bar{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.sc-sw{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sub)}
+.sc-sw button{width:42px;height:24px;border-radius:12px;border:0;background:#C9D1D8;position:relative;padding:0}
+.sc-sw button::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:9px;background:#fff;transition:left .15s}
+.sc-sw button.on{background:var(--teal)}
+.sc-sw button.on::after{left:21px}
+.sc-meta{font-size:10px;color:var(--mute)}
+.sc-root{display:flex;background:var(--card);border-radius:8px;padding:4px 2px 4px 0;position:relative}
+.sc-hours{position:relative;width:18px;flex:0 0 18px}
+.sc-hl{position:absolute;right:2px;font-size:9px;color:var(--mute);transform:translateY(-50%)}
+.sc-wx{position:relative;width:20px;flex:0 0 20px;border-right:1px solid #EEF1F4}
+.sc-wxtag{position:absolute;top:1px;left:0;right:0;text-align:center;font-size:9px;font-weight:900;color:var(--sub);height:14px;line-height:14px}
+.sc-wxh{position:absolute;left:1px;right:1px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;color:var(--sub);overflow:hidden;border-radius:3px}
+.sc-wxh svg{width:12px;height:12px}
+.sc-wxh.rain-light{background:#E3F2FD}.sc-wxh.rain-mid{background:#BBDEFB}.sc-wxh.rain-heavy{background:#FFD6D6}
+.sc-cols{flex:1;display:flex;gap:2px;min-width:0;position:relative}
+.sc-col{flex:1 1 0;min-width:0;position:relative}
+.sc-colh{position:absolute;top:0;left:1px;right:1px;height:15px;border-radius:4px;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;z-index:2}
+.sc-canvas{position:relative}
+.sc-grid{position:absolute;left:0;right:0;border-top:1px dashed #E3E8EC}
+.sc-now{position:absolute;left:0;right:0;border-top:2px solid #D9480F;z-index:3}
+.sc-blk{position:absolute;display:flex;flex-direction:column;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(23,33,43,.08);cursor:pointer;background:#fff}
+.sc-seg{min-height:0;overflow:hidden;font-size:9px;line-height:1.15;padding:1px 3px;display:flex;align-items:flex-start}
+.sc-seg.pre{background:#EEF1F4;color:#46525F}
+.sc-seg.dep{background:#FFF1C9;color:#6E4A00}
+.sc-seg.post{background:#F1F3F5;color:#6B7682}
+.sc-seg.main{flex-direction:column;font-size:10px;font-weight:700;padding:2px 3px;gap:1px}
+.sc-seg.main .t{font-size:10px;font-weight:900}
+.sc-seg.main .v{font-size:9px;font-weight:500;opacity:.85}
+.sc-blk.cancel{opacity:.45}.sc-blk.cancel .main{text-decoration:line-through}
+.sc-empty{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:12px;color:var(--mute);z-index:2}
+.sc-modal{position:fixed;inset:0;background:rgba(15,23,32,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sc-sheet{background:#fff;width:100%;max-width:480px;border-radius:14px 14px 0 0;padding:12px 14px 20px;max-height:75vh;overflow:auto}
+.sc-sheet h3{margin:0 0 6px;font-size:15px}
+.sc-sheet dl{display:grid;grid-template-columns:72px 1fr;gap:4px 8px;margin:0;font-size:13px}
+.sc-sheet dt{color:var(--sub);font-weight:700}
+.sc-sheet dd{margin:0;word-break:break-all}
 .mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:4px}
 .mcol{background:var(--card);border-radius:8px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .mhead{font-size:11px;font-weight:900;color:var(--teal);margin-bottom:1px}
@@ -126,6 +163,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     <div class="toprow"><span id="who">TAKUMI · 1年1組</span><span id="dismiss"></span></div>
     <div class="seg" id="tabs">
       <button type="button" data-tab="tt">時間割</button>
+      <button type="button" data-tab="sc">予定</button>
       <button type="button" data-tab="ck">帰宅チェック</button>
       <button type="button" data-tab="db">Dashboard</button>
     </div>
@@ -543,7 +581,176 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       '<button type="button" class="big go" id="openDash">Dashboard を開く</button>';
     $('openDash').onclick=openDashboard;
   }
-  function render(){if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else if(S.tab==='db')renderDashboard();else renderCheck();}
+
+  // ---- 予定（REGALIA_schedule_management の予定をタイムラインで。REGALIA_ChkMatchSchedule の予定タブを移植・2026-10-16）----
+  // 既定は全カテゴリ（U-13/U-14/U-15 の3列）。スイッチで U-13 だけ（1列。ALL は含めない＝Sony と同じ）。
+  // 集合・出発 → 本体 → 解散 を時間に比例した帯で積む。重なる予定は列の中で横に分ける。左に藤が丘・麻溝台の1時間天気
+  var REG={data:{},loading:{},err:''};
+  var SC_U13=false;try{SC_U13=localStorage.getItem('tdt_sc_u13')==='1';}catch(e){}
+  var KIND_COL={'match':['#DCE8FB','#1D4E9E','試合'],'TR':['#D8EFE0','#1C6436','TR'],'塾':['#FCE4CF','#8F430A','塾'],
+    'マリノス戦':['#D3EEEE','#0B5E5E','マリノス'],'日本代表戦':['#F8DDE1','#952237','代表'],'私用':['#EAE0F7','#55298A','私用'],
+    'adhoc':['#EAE0F7','#55298A','単発'],'合宿':['#F5EBC4','#6E5200','合宿']};
+  var CAT_COL={'U-13':['#0F5E73','#fff'],'U-14':['#E3E7EC','#334050'],'U-15':['#E3E7EC','#334050']};
+  function calMonday(ymd){var w='月火水木金土日'.indexOf(dowOf(ymd));return addDays(ymd,-w);}
+  function regOffset(ymd){return Math.round((Date.parse(calMonday(ymd))-Date.parse(calMonday(S.base||jstToday())))/(7*864e5));}
+  function regCacheGet(off){try{var c=JSON.parse(localStorage.getItem('tdt_reg_'+off)||'null');return c&&c.today===jstToday()?c:null;}catch(e){return null;}}
+  function regCachePut(off,d){try{localStorage.setItem('tdt_reg_'+off,JSON.stringify(d));}catch(e){}}
+  function loadRegalia(off,force){
+    if(!force&&REG.data[off]&&REG.data[off]._fresh)return Promise.resolve(REG.data[off]);
+    if(!REG.data[off]){var c=regCacheGet(off);if(c)REG.data[off]=c;}
+    if(REG.loading[off])return REG.loading[off];
+    if(!DEV&&!S.idToken)return Promise.resolve(REG.data[off]||null);
+    REG.loading[off]=api('api/regalia',{week_offset:off}).then(function(d){
+      d._fresh=true;REG.data[off]=d;REG.err='';regCachePut(off,d);delete REG.loading[off];
+      if(S.tab==='sc')renderSchedule();return d;
+    },function(e){delete REG.loading[off];REG.err=e.message;if(S.tab==='sc')renderSchedule();return null;});
+    return REG.loading[off];
+  }
+  // ChkMatch の hlTl* と同じ時刻の読み方（"19:00-21:00"、"18:30集合"、"17:20自宅出発" など）
+  function tlStrip(s){return String(s||'').replace(/（[^（）]*）/g,' ').replace(/\([^()]*\)/g,' ').replace(/\s+/g,' ').trim();}
+  function tlCore(t){
+    var s=String(t||'').trim(),x=tlStrip(s);
+    var m=x.match(/([01]?\d|2[0-3])\s*[:：]\s*([0-5]\d)\s*[-–—〜~]\s*([01]?\d|2[0-3])\s*[:：]\s*([0-5]\d)/);
+    if(m){var a=+m[1]*60+ +m[2],b=+m[3]*60+ +m[4];if(b<=a)b+=1440;return {start:a,end:b};}
+    var m2=x.match(/([01]?\d|2[0-3])\s*[:：]\s*([0-5]\d)/);
+    return m2?{start:+m2[1]*60+ +m2[2],end:+m2[1]*60+ +m2[2]+120}:null;
+  }
+  function tlLabel(raw){
+    var s=String(raw||'').replace(/（[^（）]*）/g,' ').replace(/\([^()]*\)/g,' ').replace(/\s+/g,' ').trim();
+    s=s.replace(/^[\s·・、,，/／\-–—〜~:：]+/,'').replace(/[\s·・、,，/／]+$/,'');
+    if(!s||/^[-–—〜~:：]+$/.test(s)||/^([01]?\d|2[0-3])[:：][0-5]\d$/.test(s))return '';
+    return s;
+  }
+  function tlMarks(src){
+    var s=String(src||''),re=/([01]?\d|2[0-3])\s*[:：]\s*([0-5]\d)/g,hits=[],m,out=[];
+    while((m=re.exec(s)))hits.push({st:m.index,en:re.lastIndex,m:+m[1]*60+ +m[2]});
+    hits.forEach(function(h,i){
+      var after=tlLabel(s.slice(h.en,i+1<hits.length?hits[i+1].st:s.length));
+      var before=tlLabel(s.slice(i?hits[i-1].en:0,h.st));if(before.indexOf(' ')>=0)before=before.split(/\s+/).pop();
+      out.push({m:h.m,label:after||before||''});
+    });
+    return out;
+  }
+  function tlPre(ev){return [ev.pre_event_coach,ev.pre_event_user].filter(Boolean).join(' ');}
+  function tlPost(ev){return [ev.post_event_coach,ev.post_event_user].filter(Boolean).join(' ');}
+  function tlRange(ev){
+    var c=tlCore(ev.event_time);if(!c)return null;
+    var a=c.start,b=c.end;
+    tlMarks(tlPre(ev)).forEach(function(x){if(x.m<a)a=x.m;});
+    tlMarks(tlPost(ev)).forEach(function(x){if(x.m>b)b=x.m;});
+    return {start:a,end:b,core:c};
+  }
+  function isCancelled(ev){return /^(off|removed)$/.test(String(ev.display_status||''));}
+  function catKey(c){c=String(c||'');if(/U-?14/i.test(c))return 'U-14';if(/U-?15/i.test(c))return 'U-15';if(/U-?13/i.test(c))return 'U-13';return c.toLowerCase()==='all'?'all':'U-13';}
+  function hm(m){m=((m%1440)+1440)%1440;return Math.floor(m/60)+':'+('0'+(m%60)).slice(-2);}
+  function wxVisual(x){
+    if(!x)return null;var mm=+x.rainMm||0,pr=+x.rainProb||0,code=+x.code||0;
+    var k=mm>=3?'heavy':mm>=1?'mid':(mm>=0.5||(mm>0&&pr>=51))?'light':'none';
+    return {kind:k,ico:k!=='none'?'rain':(code>=3||mm>0?'cloud':'sun')};
+  }
+  var WX_SVG={sun:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="6.5" fill="#fbbf24"/></svg>',
+    cloud:'<svg viewBox="0 0 32 32"><path fill="#AEB7C0" d="M9.5 22.5h14.2a4.8 4.8 0 0 0 .2-9.6 6.6 6.6 0 0 0-12.7-1.8A4.7 4.7 0 0 0 9.5 22.5z"/></svg>',
+    rain:'<svg viewBox="0 0 32 32"><path fill="#64748b" d="M9.2 17.4h14a4.6 4.6 0 0 0 .2-9.2 6.3 6.3 0 0 0-12.2-1.7A4.5 4.5 0 0 0 9.2 17.4z"/><g stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><path d="M11.6 21v4M16 21.4v4.4M20.4 21v4"/></g></svg>'};
+  var SC_EV=[];
+  function renderSchedule(){
+    var ymd=S.sel,off=regOffset(ymd),d=REG.data[off];
+    if(!d){loadRegalia(off);}
+    else if(!d._fresh)loadRegalia(off);
+    var h='<div class="sc-bar"><div class="sc-sw"><button type="button" id="scU13" class="'+(SC_U13?'on':'')+'" aria-label="U-13だけ表示"></button>U-13だけ</div>'+
+      '<div class="sc-meta">'+(d?esc('REGALIA '+(d.fetched_at?new Date(Date.parse(d.fetched_at)+9*3600e3).toISOString().slice(11,16)+' 取得':'')+(d._fresh?'':'（前回分・更新中）')):(REG.err?'':'読み込み中…'))+'</div></div>';
+    if(REG.err&&!d){$('main').innerHTML=h+'<div class="msg">予定を読み込めません: '+esc(REG.err)+'</div>';bindSc();return;}
+    if(!d){$('main').innerHTML=h+'<div class="msg">REGALIA の予定を読み込み中…</div>';bindSc();return;}
+    var evs=(d.events||[]).filter(function(e){return String(e.event_date).slice(0,10)===ymd;});
+    var cols=SC_U13?['U-13']:['U-13','U-14','U-15'];
+    if(SC_U13)evs=evs.filter(function(e){return catKey(e.category_code)==='U-13';});
+    // 時間の範囲（予定に合わせて 6〜22 時の中で決める。今日は今の時刻も含める）
+    var lo=1440,hi=0;
+    evs.forEach(function(e){var r=tlRange(e);if(r){lo=Math.min(lo,r.start);hi=Math.max(hi,r.end);}});
+    var today=jstToday(),nowM=0;
+    if(ymd===today){var n=new Date(Date.now()+9*3600e3);nowM=n.getUTCHours()*60+n.getUTCMinutes();lo=Math.min(lo,nowM);hi=Math.max(hi,nowM+20);}
+    var h0=hi>lo?Math.max(6,Math.floor(lo/60)):8,h1=hi>lo?Math.min(23,Math.max(h0+4,Math.ceil((hi+40)/60))):22;
+    var groups={};cols.forEach(function(c){groups[c]=[];});
+    evs.forEach(function(e){var k=catKey(e.category_code);if(k==='all')k='U-15';if(groups[k])groups[k].push(e);});
+    var maxN=Math.max.apply(null,cols.map(function(c){return groups[c].length;}).concat([1]));
+    var CH=Math.max(380,Math.min(640,(h1-h0)*34));
+    var PT=18,PB=10;
+    function y(m){return PT+(m-h0*60)/((h1-h0)*60)*(CH-PT-PB);}
+    var grid='';for(var hh=h0;hh<=h1;hh++)grid+='<div class="sc-grid" style="top:'+y(hh*60)+'px"></div>';
+    var now=(ymd===today&&nowM>=h0*60&&nowM<=h1*60)?'<div class="sc-now" style="top:'+y(nowM)+'px"></div>':'';
+    var hours='';for(hh=h0;hh<=h1;hh++)hours+='<div class="sc-hl" style="top:'+y(hh*60)+'px">'+hh+'</div>';
+    // 天気（2地点）
+    var wx='';
+    (d.weather||[]).forEach(function(L){
+      var slots=(L.hourly&&L.hourly[ymd])||[],byH={};slots.forEach(function(x){byH[x.h]=x;});
+      var inner='<div class="sc-wxtag">'+esc(String(L.name).slice(0,1))+'</div>';
+      if(slots.length){
+        for(var k=h0;k<h1;k++){var v=wxVisual(byH[k]);if(!v)continue;
+          inner+='<div class="sc-wxh'+(v.kind!=='none'?' rain-'+v.kind:'')+'" style="top:'+y(k*60)+'px;height:'+Math.max(8,y((k+1)*60)-y(k*60)-1)+'px">'+WX_SVG[v.ico]+(byH[k].temp!=null?'<span>'+byH[k].temp+'°</span>':'')+'</div>';}
+      }else{
+        var di=(L.days||[]).filter(function(x){return x.date===ymd;})[0];
+        if(di){var v2=wxVisual(di);inner+='<div class="sc-wxh'+(v2&&v2.kind!=='none'?' rain-'+v2.kind:'')+'" style="top:'+y(h0*60)+'px;height:'+(CH-y(h0*60)-PB)+'px">'+(v2?WX_SVG[v2.ico]:'')+'<span>'+di.tmax+'°</span><span>'+di.tmin+'°</span></div>';}
+      }
+      wx+='<div class="sc-wx" style="height:'+CH+'px">'+inner+'</div>';
+    });
+    SC_EV=[];
+    var colsHtml=cols.map(function(c){
+      var list=groups[c].map(function(e){var r=tlRange(e);if(!r)return null;var ds=Math.max(h0*60,r.start),de=Math.min(h1*60,r.end);if(de<=ds)return null;return {e:e,r:r,ds:ds,de:de};}).filter(Boolean);
+      list.sort(function(a,b){return a.ds-b.ds||a.de-b.de;});
+      var placed=[];list.forEach(function(it){var ln=0;while(placed.some(function(p){return p.lane===ln&&p.ds<it.de&&it.ds<p.de;}))ln++;it.lane=ln;placed.push(it);});
+      var lanes=Math.max(1,placed.reduce(function(a,p){return Math.max(a,p.lane+1);},1));
+      var blocks=placed.map(function(it){
+        var top=y(it.ds),ht=Math.max(30,y(it.de)-top),w=100/lanes,kc=KIND_COL[it.e.event_kind]||['#EEF0F3','#46525F',it.e.event_kind||''];
+        var core=it.r.core,inner='',cur=it.ds;
+        var pre=tlMarks(tlPre(it.e)).filter(function(x){return x.m<core.start;}).sort(function(a,b){return a.m-b.m;});
+        pre.forEach(function(p,i){var nx=i+1<pre.length?pre[i+1].m:core.start;var a=Math.max(cur,it.ds),b=Math.min(nx,it.de,core.start);
+          if(b>a)inner+='<div class="sc-seg '+(/出発/.test(p.label)?'dep':'pre')+'" style="flex:'+Math.max(1,b-a)+' 1 0">'+esc(hm(p.m)+(p.label||'集合'))+'</div>';cur=Math.max(cur,nx);});
+        var ms=Math.max(it.ds,core.start),me=Math.min(it.de,core.end);
+        var sub=it.e.event_kind==='match'?('vs '+(it.e.title||'')):(it.e.title||'');
+        if(me>ms)inner+='<div class="sc-seg main" style="flex:'+Math.max(1,me-ms)+' 1 0;background:'+kc[0]+';color:'+kc[1]+'"><span class="t">'+esc(hm(core.start)+'-'+hm(core.end))+'</span><span>'+esc(kc[2]+' '+sub)+'</span>'+(it.e.venue?'<span class="v">'+esc(it.e.venue)+'</span>':'')+'</div>';
+        var post=tlMarks(tlPost(it.e)).filter(function(x){return x.m>core.end;}).sort(function(a,b){return a.m-b.m;});
+        post.forEach(function(p,i){var a=i?post[i-1].m:core.end,b=p.m,qa=Math.max(a,it.ds),qb=Math.min(b,it.de);
+          if(qb>qa)inner+='<div class="sc-seg post" style="flex:'+Math.max(1,qb-qa)+' 1 0">'+esc(hm(p.m)+(p.label||'解散'))+'</div>';});
+        SC_EV.push(it.e);
+        return '<div class="sc-blk'+(isCancelled(it.e)?' cancel':'')+'" data-ev="'+(SC_EV.length-1)+'" style="top:'+top+'px;height:'+ht+'px;left:calc('+(it.lane*w)+'% + 1px);width:calc('+w+'% - 2px)">'+inner+'</div>';
+      }).join('');
+      var cc=CAT_COL[c];
+      return '<div class="sc-col" style="flex:'+lanes+' 1 0"><div class="sc-colh" style="background:'+cc[0]+';color:'+cc[1]+'">'+c+'</div><div class="sc-canvas" style="height:'+CH+'px">'+grid+now+blocks+'</div></div>';
+    }).join('');
+    h+='<div class="sc-root"><div class="sc-hours" style="height:'+CH+'px">'+hours+'</div>'+wx+'<div class="sc-cols">'+colsHtml+(evs.length?'':'<div class="sc-empty">この日は予定がありません</div>')+'</div></div>';
+    h+='<div class="note" style="margin-top:2px">予定をタップで詳細。左右スワイプで日送り。データは REGALIA スケジュール管理</div>';
+    $('main').innerHTML=h;
+    bindSc();
+    // 前後の週も先読み（日送りで週をまたいだときすぐ出す）
+    if(d&&d._fresh){var dw='月火水木金土日'.indexOf(dowOf(ymd));if(dw>=5)loadRegalia(off+1);if(dw===0)loadRegalia(off-1);}
+  }
+  function bindSc(){
+    var sw=$('scU13');if(sw)sw.onclick=function(){SC_U13=!SC_U13;try{localStorage.setItem('tdt_sc_u13',SC_U13?'1':'0');}catch(e){}renderSchedule();};
+    Array.prototype.forEach.call(document.querySelectorAll('.sc-blk'),function(b){b.onclick=function(){showEvDetail(SC_EV[+b.getAttribute('data-ev')]);};});
+  }
+  function showEvDetail(e){
+    if(!e)return;
+    var kc=KIND_COL[e.event_kind]||['','',e.event_kind||''];
+    var rows=[['日付',mdw(String(e.event_date).slice(0,10))],['時間',e.event_time],['種別',kc[2]],['カテゴリ',e.category_code],
+      ['内容',e.event_kind==='match'?('vs '+(e.title||'')):e.title],['大会',e.league_or_competition],['対戦',e.regalia_match_text],['集合（コーチ）',e.pre_event_coach],['出発（家）',e.pre_event_user],
+      ['解散（コーチ）',e.post_event_coach],['解散後（家）',e.post_event_user],['会場',e.venue],['メモ',e.notes],['状態',isCancelled(e)?'中止・削除':'']]
+      .filter(function(r){return r[1];});
+    var m=document.createElement('div');m.className='sc-modal';
+    m.innerHTML='<div class="sc-sheet"><h3>'+esc(kc[2]+' '+(e.title||''))+'</h3><dl>'+rows.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd>';}).join('')+'</dl><button type="button" class="big ghost" style="width:100%;margin-top:10px">閉じる</button></div>';
+    m.onclick=function(ev){if(ev.target===m||ev.target.tagName==='BUTTON')m.parentNode.removeChild(m);};
+    document.body.appendChild(m);
+  }
+  // 予定タブ: 左右スワイプで日送り（ChkMatch と同じ判定）
+  (function(){
+    var sx=0,sy=0,st=0;
+    document.addEventListener('touchstart',function(e){if(S.tab!=='sc'||e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now();},{passive:true});
+    document.addEventListener('touchend',function(e){
+      if(S.tab!=='sc'||!st)return;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy,dt=Date.now()-st;st=0;
+      if(document.querySelector('.sc-modal'))return;
+      if(Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.5||dt>1000)return;
+      go(addDays(S.sel,dx<0?1:-1));
+    },{passive:true});
+  })();
+  function render(){if(S.tab==='sc')renderSchedule();else if(S.tab==='tt')renderTimetable();else if(S.tab==='fam')renderFamily();else if(S.tab==='db')renderDashboard();else renderCheck();}
 
   $('prev').onclick=function(){go(addDays(S.sel,S.tab==='tt'?-7:-1));};
   $('next').onclick=function(){go(addDays(S.sel,S.tab==='tt'?7:1));};
@@ -671,6 +878,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
       else{renderHeader();render();}
       if(S.tab==='ck'&&S.sel!==today)loadState();
       clog('boot_done','total '+(Date.now()-T0)+'ms school '+(sc.school?'sent':'cached'));
+      setTimeout(function(){loadRegalia(regOffset(S.sel));},300);
     }catch(e){
       clog('init_fail',(e&&e.message||e)+(e&&e.stack?' | '+String(e.stack).split('\n').slice(0,3).join(' / '):''));
       if(started){showBanner('サーバーにつながりません（前回の内容を表示中）: '+(e&&e.message||e)+' — 下の v… をタップで診断');}
