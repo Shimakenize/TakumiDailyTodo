@@ -22,7 +22,8 @@ header{background:var(--ink);color:#fff;padding:8px 10px 8px;display:flex;flex-d
 .round{width:34px;height:34px;border-radius:17px;border:1px solid #3A4856;background:transparent;color:#fff;display:flex;align-items:center;justify-content:center}
 .round svg{width:16px;height:16px}
 .round:disabled{opacity:.3}
-.dlabel{display:flex;align-items:baseline;gap:6px}
+.dlabel{display:flex;align-items:baseline;gap:6px;background:transparent;border:0;padding:4px 2px;color:inherit;text-align:inherit}
+.dlabel:not(.is-today):active{opacity:.6}
 .rel{font-size:11px;font-weight:700;color:var(--mint);letter-spacing:.06em}
 .md{font-size:20px;font-weight:900;line-height:1}
 .md small{font-size:13px;font-weight:700;margin-left:1px}
@@ -172,7 +173,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     </div>
     <div class="daynav">
       <button type="button" class="round" id="prev" aria-label="前の日"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div class="dlabel"><div class="rel" id="rel"></div><div class="md" id="md"></div></div>
+      <button type="button" class="dlabel" id="todayBtn" aria-label="今日に戻る"><div class="rel" id="rel"></div><div class="md" id="md"></div></button>
       <button type="button" class="round" id="next" aria-label="次の日"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
     <div class="week" id="week"></div>
@@ -186,7 +187,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 (function(){
   var CONFIG_URL='https://script.google.com/macros/s/AKfycbz5CbyoyJLffe1sB-ANP66I3nyZYV78LhFGhYDhFUR6mYxtNdSHGYyijnwKZtecuEZL4A/exec';
   // 画面の版。GAS の APP_VERSION と違えば（開きっぱなしの古い画面）1回だけ読み込み直す
-  var UI_BUILD='0.6.1';
+  var UI_BUILD='0.6.2';
   var DEV=new URLSearchParams(location.search).get('dev')||'';
   var COLORS={"英語":["#DCE8FB","#1D4E9E"],"数学":["#FCE4CF","#8F430A"],"国語":["#F8DDE1","#952237"],"理科":["#D8EFE0","#1C6436"],"社会":["#F5EBC4","#6E5200"],"体育":["#D3EEEE","#0B5E5E"],"音楽":["#EAE0F7","#55298A"],"美術":["#F7DEEE","#86245F"],"音美":["#EEEAF4","#4E3F66"],"技術":["#E3E7EC","#334050"],"家庭":["#E3E7EC","#334050"],"行事":["#FFF0D9","#7A4300"],"授業なし":["#F1F3F5","#8A96A1"]};
   var MARKS=['①','②','③','④','⑤','⑥'];
@@ -557,14 +558,19 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab);});
     var diff=Math.round((Date.parse(S.sel)-Date.parse(S.base))/864e5);
     var w=dowOf(S.sel);
+    var onToday;
     if(S.tab==='tt'){
       var wm=weekMonday(S.sel),bm=weekMonday(S.base),wd=Math.round((Date.parse(wm)-Date.parse(bm))/(7*864e5));
       $('rel').textContent={0:'今週',1:'来週','-1':'先週'}[wd]||'';
       $('md').innerHTML=esc(md(wm))+'<small>〜'+esc(md(addDays(wm,4)))+'</small>';
+      onToday=wd===0;
     }else{
       $('rel').textContent={0:'今日',1:'明日','-1':'きのう'}[diff]||'';
       $('md').innerHTML=esc(md(S.sel))+'<small style="color:'+(w==='日'?'#FF9C9C':w==='土'?'#9CC7FF':'#fff')+'">（'+w+'）</small>';
+      onToday=diff===0;
     }
+    $('todayBtn').classList.toggle('is-today',onToday);
+    $('todayBtn').setAttribute('aria-disabled',onToday?'true':'false');
     var dIdx='月火水木金土日'.indexOf(w),mon=addDays(S.sel,-dIdx),h='';
     for(var i=0;i<7;i++){var y=addDays(mon,i);h+='<button type="button" data-day="'+y+'" class="'+(y===S.sel?'sel ':'')+(y===S.base?'base ':'')+(isOff(y)?'off':'')+'"><span>'+dowOf(y)+'</span><span>'+Number(y.slice(8))+'</span></button>';}
     $('week').innerHTML=h;
@@ -818,6 +824,7 @@ main{padding:8px 8px 24px;display:flex;flex-direction:column;gap:4px}
 
   $('prev').onclick=function(){go(addDays(S.sel,S.tab==='tt'?-7:-1));};
   $('next').onclick=function(){go(addDays(S.sel,S.tab==='tt'?7:1));};
+  $('todayBtn').onclick=function(){if(S.base)go(S.base);};
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.onclick=function(){S.tab=b.getAttribute('data-tab');renderHeader();render();if(S.tab==='ck')loadState();if(S.tab==='db')openDashboard();};});
 
   // ---- 起動 ----
